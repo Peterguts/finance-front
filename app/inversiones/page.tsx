@@ -1,8 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { Loader2, AlertTriangle } from "lucide-react";
-import { PortfolioSummary } from "@/components/portfolio-summary";
+import { Loader2 } from "lucide-react";
 import { InvestmentList } from "@/components/investment-list";
 import { AddInvestmentForm } from "@/components/add-investment-form";
 import { AppHeader } from "@/components/app-header";
@@ -55,40 +54,16 @@ export default function InversionesPage() {
             </div>
           </div>
         ) : portfolio ? (
-          <div className="space-y-10">
-            {pricesStatus && !pricesStatus.live && (
-              <div
-                className="flex items-center gap-3 rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-warning-foreground"
-                role="alert"
-              >
-                <AlertTriangle className="h-5 w-5 shrink-0" />
-                <p className="text-sm font-medium">
-                  No se pudieron obtener precios del mercado en tiempo real. Los valores mostrados pueden ser estimados o del último disponible.
-                </p>
-              </div>
-            )}
-            <section>
-              <h2 className="text-lg font-semibold text-foreground mb-4">Resumen rápido</h2>
-              <PortfolioSummary
-                totalInvested={portfolio.total_invested}
-                currentValue={portfolio.current_value}
-                totalPnl={portfolio.total_pnl}
-                pnlPercentage={portfolio.pnl_percentage}
-              />
-            </section>
-
-            <section>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                <h2 className="text-lg font-semibold text-foreground">Tus inversiones</h2>
-                <AddInvestmentForm onSuccess={handleRefresh} />
-              </div>
-              <InvestmentList
-                investments={portfolio.investments}
-                prices={prices || {}}
-                onDelete={handleRefresh}
-              />
-            </section>
-          </div>
+          <section>
+            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <AddInvestmentForm onSuccess={handleRefresh} />
+            </div>
+            <InvestmentList
+              investments={portfolio.investments}
+              prices={prices || {}}
+              onDelete={handleRefresh}
+            />
+          </section>
         ) : null}
       </main>
     </div>
