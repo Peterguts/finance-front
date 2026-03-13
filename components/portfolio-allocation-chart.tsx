@@ -75,10 +75,11 @@ export function PortfolioAllocationChart({
                 borderRadius: "var(--radius-md)",
               }}
               labelStyle={{ color: "var(--color-foreground)" }}
-              formatter={(value: number, name: string, props: { payload: { valueGtq: number } }) => {
+              formatter={(value: number, name: string, props: { payload?: { valueGtq?: number } }) => {
                 const pct = totalUsd > 0 ? (value / totalUsd) * 100 : 0;
+                const valueGtq = props.payload?.valueGtq ?? 0;
                 return [
-                  `${formatCurrency(value, "USD")} · ${formatCurrency(props.payload.valueGtq, "GTQ")} (${formatPercentage(pct)})`,
+                  `${formatCurrency(value, "USD")} · ${formatCurrency(valueGtq, "GTQ")} (${formatPercentage(pct)})`,
                   name,
                 ];
               }}
