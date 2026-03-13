@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { InvestmentList } from "@/components/investment-list";
 import { AddInvestmentForm } from "@/components/add-investment-form";
 import { AppHeader } from "@/components/app-header";
-import { fetchPortfolioSummary, fetchPrices, fetchPricesStatus } from "@/lib/api";
+import { fetchPortfolioSummary, fetchPricesForTickers, fetchPricesStatus } from "@/lib/api";
 
 export default function InversionesPage() {
   const {
@@ -15,9 +15,15 @@ export default function InversionesPage() {
     mutate: mutatePortfolio,
   } = useSWR("portfolio", fetchPortfolioSummary, { refreshInterval: 30000 });
 
-  const { data: prices, mutate: mutatePrices } = useSWR("prices", fetchPrices, {
-    refreshInterval: 30000,
-  });
+  const tickers = portfolio?.investments?.map((i) => i.ticker).filter(Boolean) ?? [];
+  const tickerKey =
+    tickers.length > 0 ? ["prices", [...new Set(tickers)].sort().join(",")] : null;
+  const { data: prices, mutate: mutatePrices } = useSWR(
+    tickerKey,
+    ([, tickerStr]: [string, string]) =>
+      fetchPricesForTickers(tickerStr ? tickerStr.split(",") : []),
+    { refreshInterval: 30000 }
+  );
 
   const { data: pricesStatus } = useSWR("prices-status", fetchPricesStatus, {
     refreshInterval: 60000,
@@ -60,7 +66,7 @@ export default function InversionesPage() {
             </div>
             <InvestmentList
               investments={portfolio.investments}
-              prices={prices || {}}
+              prices={prices ?? {}}
               onDelete={handleRefresh}
             />
           </section>

@@ -9,6 +9,7 @@ import {
   formatCurrency,
   formatNumber,
   formatPercentage,
+  getCurrentPrice,
 } from "@/lib/utils";
 import { deleteInvestment } from "@/lib/api";
 
@@ -58,11 +59,15 @@ export function InvestmentList({ investments, prices, onDelete }: InvestmentList
           </thead>
           <tbody>
             {investments.map((investment) => {
-              const currentPrice = prices[investment.ticker] || investment.buy_price;
+              const currentPrice = getCurrentPrice(
+                prices,
+                investment.ticker,
+                investment.buy_price
+              );
               const investedValueUsd = investment.amount * investment.buy_price;
               const currentValueUsd = investment.amount * currentPrice;
               const pnlUsd = currentValueUsd - investedValueUsd;
-              const pnlPercent = (pnlUsd / investedValueUsd) * 100;
+              const pnlPercent = investedValueUsd > 0 ? (pnlUsd / investedValueUsd) * 100 : 0;
               const isPositive = pnlUsd >= 0;
 
               const currentValueGtq = convertUsdToGtq(currentValueUsd);

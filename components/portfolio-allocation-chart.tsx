@@ -2,7 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import type { Investment } from "@/lib/types";
-import { convertUsdToGtq, formatCurrency, formatPercentage } from "@/lib/utils";
+import { convertUsdToGtq, formatCurrency, formatPercentage, getCurrentPrice } from "@/lib/utils";
 
 interface PortfolioAllocationChartProps {
   investments: Investment[];
@@ -24,7 +24,7 @@ export function PortfolioAllocationChart({
   prices,
 }: PortfolioAllocationChartProps) {
   const items = investments.map((inv) => {
-    const currentPrice = prices[inv.ticker] || inv.buy_price;
+    const currentPrice = getCurrentPrice(prices, inv.ticker, inv.buy_price);
     const valueUsd = inv.amount * currentPrice;
     const valueGtq = convertUsdToGtq(valueUsd);
     return { name: inv.ticker, valueUsd, valueGtq, value: valueUsd };

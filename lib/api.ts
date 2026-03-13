@@ -65,6 +65,28 @@ export async function fetchPrice(ticker: string): Promise<{ ticker: string; pric
   return handleResponse<{ ticker: string; price: number }>(response);
 }
 
+/**
+ * Obtiene el precio actual de cada ticker llamando a /prices/{ticker}.
+ * Así se asegura tener el precio de cada activo aunque /prices no los devuelva todos.
+ */
+export async function fetchPricesForTickers(
+  tickers: string[]
+): Promise<Record<string, number>> {
+  const unique = [...new Set(tickers.map((t) => t.trim().toUpperCase()).filter(Boolean))];
+  if (unique.length === 0) return {};
+  const results = await Promise.allSettled(
+    unique.map((ticker) => fetchPrice(ticker))
+  );
+  const prices: Record<string, number> = {};
+  results.forEach((result, i) => {
+    const ticker = unique[i];
+    if (result.status === "fulfilled" && result.value?.price != null && !Number.isNaN(result.value.price)) {
+      prices[ticker] = result.value.price;
+    }
+  });
+  return prices;
+}
+
 export async function fetchPricesStatus(): Promise<{ live: boolean }> {
   const response = await fetch(`${API_BASE}/prices/status`);
   return handleResponse<{ live: boolean }>(response);

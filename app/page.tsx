@@ -6,8 +6,8 @@ import { Loader2, ArrowRight, AlertTriangle, TrendingUp, TrendingDown } from "lu
 import { PortfolioSummary } from "@/components/portfolio-summary";
 import { PortfolioAllocationChart } from "@/components/portfolio-allocation-chart";
 import { AppHeader } from "@/components/app-header";
-import { fetchPortfolioSummary, fetchPrices, fetchPricesStatus } from "@/lib/api";
-import { cn, convertUsdToGtq, formatCurrency, formatPercentage } from "@/lib/utils";
+import { fetchPortfolioSummary, fetchPricesForTickers, fetchPricesStatus } from "@/lib/api";
+import { cn, convertUsdToGtq, formatCurrency, formatPercentage, getCurrentPrice, formatNumber } from "@/lib/utils";
 
 export default function DashboardPage() {
   const {
@@ -17,11 +17,19 @@ export default function DashboardPage() {
     mutate: mutatePortfolio,
   } = useSWR("portfolio", fetchPortfolioSummary, { refreshInterval: 30000 });
 
+  const tickers = portfolio?.investments?.map((i) => i.ticker).filter(Boolean) ?? [];
+  const tickerKey =
+    tickers.length > 0 ? ["prices", [...new Set(tickers)].sort().join(",")] : null;
   const {
     data: prices,
     isLoading: pricesLoading,
     mutate: mutatePrices,
-  } = useSWR("prices", fetchPrices, { refreshInterval: 30000 });
+  } = useSWR(
+    tickerKey,
+    ([, tickerStr]: [string, string]) =>
+      fetchPricesForTickers(tickerStr ? tickerStr.split(",") : []),
+    { refreshInterval: 30000 }
+  );
 
   const { data: pricesStatus } = useSWR("prices-status", fetchPricesStatus, {
     refreshInterval: 60000,
@@ -34,6 +42,8 @@ export default function DashboardPage() {
     mutatePortfolio();
     mutatePrices();
   };
+
+  const pricesMap = prices ?? {};
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -93,7 +103,11 @@ export default function DashboardPage() {
               </p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {portfolio.investments.map((investment) => {
-                  const currentPrice = (prices || {})[investment.ticker] || investment.buy_price;
+                  const currentPrice = getCurrentPrice(
+                    pricesMap,
+                    investment.ticker,
+                    investment.buy_price
+                  );
                   const investedValueUsd = investment.amount * investment.buy_price;
                   const currentValueUsd = investment.amount * currentPrice;
                   const pnlUsd = currentValueUsd - investedValueUsd;
@@ -108,6 +122,9 @@ export default function DashboardPage() {
                     >
                       <div>
                         <p className="text-sm font-semibold text-foreground">{investment.ticker}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Cantidad: {formatNumber(investment.amount)} acciones
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           Invertido: {formatCurrency(investedValueUsd, "USD")}
                         </p>
@@ -146,7 +163,7 @@ export default function DashboardPage() {
             <section>
               <PortfolioAllocationChart
                 investments={portfolio.investments}
-                prices={prices || {}}
+                prices={pricesMap}
               />
             </section>
 
