@@ -19,6 +19,15 @@ const CHART_COLORS = [
   "var(--chart-7)",
 ];
 
+function colorForName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  }
+  const index = Math.abs(hash) % CHART_COLORS.length;
+  return CHART_COLORS[index];
+}
+
 export function PortfolioAllocationChart({
   investments,
   prices,
@@ -64,8 +73,8 @@ export function PortfolioAllocationChart({
               dataKey="value"
               nameKey="name"
             >
-              {sorted.map((_, index) => (
-                <Cell key={sorted[index].name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+              {sorted.map((item) => (
+                <Cell key={item.name} fill={colorForName(item.name)} />
               ))}
             </Pie>
             <Tooltip
@@ -113,7 +122,7 @@ export function PortfolioAllocationChart({
               <div className="flex items-center gap-3">
                 <span
                   className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                  style={{ backgroundColor: colorForName(item.name) }}
                 />
                 <div>
                   <p className="font-medium text-foreground">{item.name}</p>

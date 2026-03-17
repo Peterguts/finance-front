@@ -25,15 +25,16 @@
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --chart-1: #0a0a0a;
-  --chart-2: #404040;
-  --chart-3: #737373;
-  --chart-4: #a3a3a3;
-  --chart-5: #525252;
-  --chart-6: #262626;
-  --chart-7: #d4d4d4;
+  /* Colores vivos para el gráfico de distribución */
+  --chart-1: #2563eb; /* azul */
+  --chart-2: #16a34a; /* verde */
+  --chart-3: #f97316; /* naranja */
+  --chart-4: #e11d48; /* rosa/rojo */
+  --chart-5: #7c3aed; /* morado */
+  --chart-6: #0d9488; /* teal */
+  --chart-7: #facc15; /* amarillo */
 }
 
 .theme-dark {
@@ -57,23 +58,34 @@
   --color-success-foreground: #ffffff;
   --color-warning: #ca8a04;
   --color-warning-foreground: #fafafa;
-  --chart-1: #fafafa;
-  --chart-2: #a3a3a3;
-  --chart-3: #737373;
-  --chart-4: #525252;
-  --chart-5: #d4d4d4;
-  --chart-6: #e5e5e5;
-  --chart-7: #404040;
+  --chart-1: #60a5fa;
+  --chart-2: #4ade80;
+  --chart-3: #fdba74;
+  --chart-4: #fb7185;
+  --chart-5: #a855f7;
+  --chart-6: #2dd4bf;
+  --chart-7: #facc15;
 }
 
 * {
   border-color: var(--color-border);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+}
+
+/* Un poco más grande en móvil para legibilidad */
+@media (max-width: 640px) {
+  body {
+    font-size: 16.5px;
+  }
 }
 
 /* Force card and card-like backgrounds to use theme variable so dark mode works */

@@ -8,6 +8,8 @@ interface PortfolioSummaryProps {
   currentValue: number;
   totalPnl: number;
   pnlPercentage: number;
+  totalRealizedPnl?: number;
+  totalUnrealizedPnl?: number;
 }
 
 export function PortfolioSummary({
@@ -15,44 +17,69 @@ export function PortfolioSummary({
   currentValue,
   totalPnl,
   pnlPercentage,
+  totalRealizedPnl,
+  totalUnrealizedPnl,
 }: PortfolioSummaryProps) {
   const isPositive = totalPnl >= 0;
+  const hasBreakdown = totalRealizedPnl != null && totalUnrealizedPnl != null;
 
   const totalInvestedGtq = convertUsdToGtq(totalInvested);
   const currentValueGtq = convertUsdToGtq(currentValue);
   const totalPnlGtq = convertUsdToGtq(totalPnl);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <SummaryCard
-        title="Total invertido"
-        value={formatCurrency(totalInvested, "USD")}
-        secondary={formatCurrency(totalInvestedGtq, "GTQ")}
-        icon={<Wallet className="h-5 w-5" />}
-        variant="default"
-      />
-      <SummaryCard
-        title="Valor actual"
-        value={formatCurrency(currentValue, "USD")}
-        secondary={formatCurrency(currentValueGtq, "GTQ")}
-        icon={<DollarSign className="h-5 w-5" />}
-        variant="default"
-      />
-      <SummaryCard
-        title="Ganancia / Pérdida"
-        value={formatCurrency(Math.abs(totalPnl), "USD")}
-        secondary={formatCurrency(Math.abs(totalPnlGtq), "GTQ")}
-        prefix={totalPnl >= 0 ? "+" : "-"}
-        icon={isPositive ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
-        variant={isPositive ? "success" : "destructive"}
-      />
-      <SummaryCard
-        title="Rendimiento"
-        value={formatPercentage(pnlPercentage)}
-        secondary="vs capital total"
-        icon={<BarChart3 className="h-5 w-5" />}
-        variant={pnlPercentage >= 0 ? "success" : "destructive"}
-      />
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryCard
+          title="Total invertido"
+          value={formatCurrency(totalInvested, "USD")}
+          secondary={formatCurrency(totalInvestedGtq, "GTQ")}
+          icon={<Wallet className="h-5 w-5" />}
+          variant="default"
+        />
+        <SummaryCard
+          title="Valor actual"
+          value={formatCurrency(currentValue, "USD")}
+          secondary={formatCurrency(currentValueGtq, "GTQ")}
+          icon={<DollarSign className="h-5 w-5" />}
+          variant="default"
+        />
+        <SummaryCard
+          title="Ganancia / Pérdida total"
+          value={formatCurrency(Math.abs(totalPnl), "USD")}
+          secondary={formatCurrency(Math.abs(totalPnlGtq), "GTQ")}
+          prefix={totalPnl >= 0 ? "+" : "-"}
+          icon={isPositive ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+          variant={isPositive ? "success" : "destructive"}
+        />
+        <SummaryCard
+          title="Rendimiento"
+          value={formatPercentage(pnlPercentage)}
+          secondary="vs capital total"
+          icon={<BarChart3 className="h-5 w-5" />}
+          variant={pnlPercentage >= 0 ? "success" : "destructive"}
+        />
+      </div>
+      {hasBreakdown && (totalRealizedPnl !== 0 || totalUnrealizedPnl !== 0) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SummaryCard
+            title="G/P realizado (ventas)"
+            value={formatCurrency(Math.abs(totalRealizedPnl), "USD")}
+            secondary={formatCurrency(Math.abs(convertUsdToGtq(totalRealizedPnl)), "GTQ")}
+            prefix={totalRealizedPnl >= 0 ? "+" : "-"}
+            icon={totalRealizedPnl >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+            variant={totalRealizedPnl >= 0 ? "success" : "destructive"}
+          />
+          <SummaryCard
+            title="G/P no realizado (posición)"
+            value={formatCurrency(Math.abs(totalUnrealizedPnl), "USD")}
+            secondary={formatCurrency(Math.abs(convertUsdToGtq(totalUnrealizedPnl)), "GTQ")}
+            prefix={totalUnrealizedPnl >= 0 ? "+" : "-"}
+            icon={totalUnrealizedPnl >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+            variant={totalUnrealizedPnl >= 0 ? "success" : "destructive"}
+          />
+        </div>
+      )}
     </div>
   );
 }

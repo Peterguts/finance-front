@@ -1,4 +1,11 @@
-import type { Investment, InvestmentCreate, PortfolioSummary } from "./types";
+import type {
+  Investment,
+  InvestmentCreate,
+  Movement,
+  PortfolioSummary,
+  Sale,
+  SaleCreate,
+} from "./types";
 
 const API_BASE =
   typeof process.env.NEXT_PUBLIC_API_URL === "string" &&
@@ -61,27 +68,62 @@ export async function fetchPrices(): Promise<Record<string, number>> {
 }
 
 export async function fetchPrice(ticker: string): Promise<{ ticker: string; price: number }> {
-  const response = await fetch(`${API_BASE}/prices/${ticker}`);
+  const response = await fetch(`${API_BASE}/prices/${encodeURIComponent(ticker)}`);
   return handleResponse<{ ticker: string; price: number }>(response);
 }
 
 /**
+ * Genera variantes del ticker para APIs que usan formatos distintos
+ * (ej. LINKUSD -> LINK-USD, BTCUSD -> BTC-USD).
+ */
+function getTickerVariants(ticker: string): string[] {
+  const variants = [ticker];
+  if (/^[A-Z0-9]+USD$/i.test(ticker) && !ticker.includes("-")) {
+    const base = ticker.slice(0, -3);
+    variants.push(`${base}-USD`);
+  }
+  if (/^[A-Z0-9]+USDT$/i.test(ticker) && !ticker.includes("-")) {
+    const base = ticker.slice(0, -4);
+    variants.push(`${base}-USD`, `${base}-USDT`);
+  }
+  return variants;
+}
+
+/**
+ * Obtiene el precio de un ticker probando el símbolo y sus variantes (ej. LINKUSD y LINK-USD).
+ */
+async function fetchPriceWithVariants(
+  ticker: string
+): Promise<{ ticker: string; price: number } | null> {
+  const variants = getTickerVariants(ticker);
+  for (const variant of variants) {
+    try {
+      const result = await fetchPrice(variant);
+      if (result?.price != null && !Number.isNaN(result.price)) {
+        return { ticker, price: result.price };
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
  * Obtiene el precio actual de cada ticker llamando a /prices/{ticker}.
- * Así se asegura tener el precio de cada activo aunque /prices no los devuelva todos.
+ * Prueba variantes (ej. LINKUSD -> LINK-USD) por si el backend usa otro formato.
  */
 export async function fetchPricesForTickers(
   tickers: string[]
 ): Promise<Record<string, number>> {
   const unique = [...new Set(tickers.map((t) => t.trim().toUpperCase()).filter(Boolean))];
   if (unique.length === 0) return {};
-  const results = await Promise.allSettled(
-    unique.map((ticker) => fetchPrice(ticker))
-  );
+  const results = await Promise.all(unique.map((ticker) => fetchPriceWithVariants(ticker)));
   const prices: Record<string, number> = {};
   results.forEach((result, i) => {
     const ticker = unique[i];
-    if (result.status === "fulfilled" && result.value?.price != null && !Number.isNaN(result.value.price)) {
-      prices[ticker] = result.value.price;
+    if (result?.price != null && !Number.isNaN(result.price)) {
+      prices[ticker] = result.price;
     }
   });
   return prices;
@@ -90,4 +132,47 @@ export async function fetchPricesForTickers(
 export async function fetchPricesStatus(): Promise<{ live: boolean }> {
   const response = await fetch(`${API_BASE}/prices/status`);
   return handleResponse<{ live: boolean }>(response);
+}
+
+export async function fetchSales(params?: {
+  ticker?: string;
+  from_date?: string;
+  to_date?: string;
+  limit?: number;
+}): Promise<Sale[]> {
+  const search = new URLSearchParams();
+  if (params?.ticker) search.set("ticker", params.ticker);
+  if (params?.from_date) search.set("from_date", params.from_date);
+  if (params?.to_date) search.set("to_date", params.to_date);
+  if (params?.limit != null) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  const response = await fetch(`${API_BASE}/sales${qs ? `?${qs}` : ""}`);
+  return handleResponse<Sale[]>(response);
+}
+
+export async function createSale(data: SaleCreate): Promise<Sale> {
+  const response = await fetch(`${API_BASE}/sales`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<Sale>(response);
+}
+
+export async function fetchMovements(params?: {
+  ticker?: string;
+  from_date?: string;
+  to_date?: string;
+  type?: "buy" | "sell";
+  limit?: number;
+}): Promise<Movement[]> {
+  const search = new URLSearchParams();
+  if (params?.ticker) search.set("ticker", params.ticker);
+  if (params?.from_date) search.set("from_date", params.from_date);
+  if (params?.to_date) search.set("to_date", params.to_date);
+  if (params?.type) search.set("type", params.type);
+  if (params?.limit != null) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  const response = await fetch(`${API_BASE}/movements${qs ? `?${qs}` : ""}`);
+  return handleResponse<Movement[]>(response);
 }

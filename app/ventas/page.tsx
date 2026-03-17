@@ -2,13 +2,11 @@
 
 import useSWR from "swr";
 import { Loader2 } from "lucide-react";
-import { InvestmentList } from "@/components/investment-list";
-import { AddInvestmentForm } from "@/components/add-investment-form";
+import { SellForm } from "@/components/sell-form";
 import { AppHeader } from "@/components/app-header";
-import { fetchPortfolioSummary, fetchPricesForTickers, fetchPricesStatus } from "@/lib/api";
-import type { PortfolioPosition } from "@/lib/types";
+import { fetchPortfolioSummary } from "@/lib/api";
 
-export default function InversionesPage() {
+export default function VentasPage() {
   const {
     data: portfolio,
     error,
@@ -16,29 +14,8 @@ export default function InversionesPage() {
     mutate: mutatePortfolio,
   } = useSWR("portfolio", fetchPortfolioSummary, { refreshInterval: 30000 });
 
-  const tickers = portfolio?.investments?.map((i) => i.ticker).filter(Boolean) ?? [];
-  const tickerKey =
-    tickers.length > 0 ? ["prices", [...new Set(tickers)].sort().join(",")] : null;
-  const { data: prices, mutate: mutatePrices } = useSWR(
-    tickerKey,
-    ([, tickerStr]: [string, string]) =>
-      fetchPricesForTickers(tickerStr ? tickerStr.split(",") : []),
-    { refreshInterval: 30000 }
-  );
-
-  const { data: pricesStatus } = useSWR("prices-status", fetchPricesStatus, {
-    refreshInterval: 60000,
-  });
-
-  const positionsByTicker: Record<string, PortfolioPosition> =
-    (portfolio?.positions ?? []).reduce((acc, pos) => {
-      acc[pos.ticker] = pos;
-      return acc;
-    }, {} as Record<string, PortfolioPosition>);
-
   const handleRefresh = () => {
     mutatePortfolio();
-    mutatePrices();
   };
 
   return (
@@ -46,6 +23,12 @@ export default function InversionesPage() {
       <AppHeader onRefresh={handleRefresh} isRefreshing={isLoading} />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+        <div className="mb-6">
+          <h1 className="text-xl font-semibold text-foreground">Ventas</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Registra ventas de acciones para llevar el control de ganancias y pérdidas realizadas.
+          </p>
+        </div>
         {error ? (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
             <p className="text-destructive">
@@ -67,16 +50,8 @@ export default function InversionesPage() {
             </div>
           </div>
         ) : portfolio ? (
-          <section>
-            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <AddInvestmentForm onSuccess={handleRefresh} />
-            </div>
-            <InvestmentList
-              investments={portfolio.investments}
-              prices={prices ?? {}}
-              positionsByTicker={positionsByTicker}
-              onChange={handleRefresh}
-            />
+          <section className="space-y-6">
+            <SellForm positions={portfolio.positions} onSuccess={handleRefresh} />
           </section>
         ) : null}
       </main>
