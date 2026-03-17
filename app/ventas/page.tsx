@@ -51,7 +51,7 @@ export default function VentasPage() {
           </div>
         ) : portfolio ? (
           <section className="space-y-6">
-            <SellForm positions={portfolio.positions} onSuccess={handleRefresh} />
+            <SellForm positions={portfolio.positions ?? []} onSuccess={handleRefresh} />
           </section>
         ) : null}
       </main>
