@@ -3,7 +3,16 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, List, RefreshCw, PieChart, FileText, Menu, X } from "lucide-react";
+import {
+  LayoutDashboard,
+  List,
+  RefreshCw,
+  PieChart,
+  FileText,
+  Menu,
+  X,
+  PiggyBank,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function FinanceLogo({ className }: { className?: string }) {
@@ -39,9 +48,10 @@ function FinanceLogo({ className }: { className?: string }) {
 interface AppHeaderProps {
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  fxRateLabel?: string;
 }
 
-export function AppHeader({ onRefresh, isRefreshing }: AppHeaderProps) {
+export function AppHeader({ onRefresh, isRefreshing, fxRateLabel }: AppHeaderProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -51,6 +61,7 @@ export function AppHeader({ onRefresh, isRefreshing }: AppHeaderProps) {
       { href: "/#distribucion", label: "Distribución", icon: <PieChart className="h-4 w-4" /> },
       { href: "/#inversiones", label: "Inversiones", icon: <List className="h-4 w-4" /> },
       { href: "/#reportes", label: "Reportes", icon: <FileText className="h-4 w-4" /> },
+      { href: "/depositos", label: "Depósitos", icon: <PiggyBank className="h-4 w-4" /> },
     ],
     []
   );
@@ -107,6 +118,11 @@ export function AppHeader({ onRefresh, isRefreshing }: AppHeaderProps) {
             </Link>
           ))}
         </nav>
+        {fxRateLabel ? (
+          <div className="hidden sm:block text-xs text-muted-foreground">
+            USD/GTQ: <span className="font-mono">{fxRateLabel}</span>
+          </div>
+        ) : null}
       </div>
 
       {mobileOpen && (

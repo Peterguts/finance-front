@@ -13,8 +13,30 @@ export interface PortfolioSummary {
   pnl_percentage: number;
   total_realized_pnl?: number;
   total_unrealized_pnl?: number;
+  total_deposited?: number;
+  total_spent_on_buys?: number;
+  total_received_from_sales?: number;
+  estimated_cash?: number;
+  estimated_net_worth?: number;
   investments: Investment[];
   positions?: PortfolioPosition[];
+}
+
+export interface Deposit {
+  id: string;
+  date: string;
+  amount: number;
+  commission_pct: number;
+  commission_amount: number;
+  total: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DepositCreate {
+  date: string;
+  amount: number;
+  commission_pct: number;
 }
 
 export interface PortfolioPosition {

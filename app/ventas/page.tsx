@@ -4,7 +4,9 @@ import useSWR from "swr";
 import { Loader2 } from "lucide-react";
 import { SellForm } from "@/components/sell-form";
 import { AppHeader } from "@/components/app-header";
-import { fetchPortfolioSummary } from "@/lib/api";
+import { fetchPortfolioSummary, fetchUsdGtqRate } from "@/lib/api";
+import { formatNumber, setUsdToGtqRate } from "@/lib/utils";
+import { useEffect } from "react";
 
 export default function VentasPage() {
   const {
@@ -13,14 +15,23 @@ export default function VentasPage() {
     isLoading,
     mutate: mutatePortfolio,
   } = useSWR("portfolio", fetchPortfolioSummary, { refreshInterval: 30000 });
+  const { data: fxRate } = useSWR("fx-usd-gtq", fetchUsdGtqRate, { refreshInterval: 300000 });
 
   const handleRefresh = () => {
     mutatePortfolio();
   };
 
+  useEffect(() => {
+    if (fxRate?.rate) setUsdToGtqRate(fxRate.rate);
+  }, [fxRate?.rate]);
+
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader onRefresh={handleRefresh} isRefreshing={isLoading} />
+      <AppHeader
+        onRefresh={handleRefresh}
+        isRefreshing={isLoading}
+        fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
+      />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <div className="mb-6">

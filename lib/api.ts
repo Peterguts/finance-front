@@ -1,4 +1,6 @@
 import type {
+  Deposit,
+  DepositCreate,
   Investment,
   InvestmentCreate,
   Movement,
@@ -26,8 +28,9 @@ export async function fetchPortfolioSummary(): Promise<PortfolioSummary> {
   return handleResponse<PortfolioSummary>(response);
 }
 
-export async function fetchInvestments(): Promise<Investment[]> {
-  const response = await fetch(`${API_BASE}/investments`);
+export async function fetchInvestments(ticker?: string): Promise<Investment[]> {
+  const q = ticker?.trim() ? `?ticker=${encodeURIComponent(ticker.trim())}` : "";
+  const response = await fetch(`${API_BASE}/investments${q}`);
   return handleResponse<Investment[]>(response);
 }
 
@@ -134,6 +137,23 @@ export async function fetchPricesStatus(): Promise<{ live: boolean }> {
   return handleResponse<{ live: boolean }>(response);
 }
 
+export async function fetchUsdGtqRate(): Promise<{
+  pair: string;
+  rate: number;
+  live: boolean;
+  source: string;
+  updated_at: string;
+}> {
+  const response = await fetch(`${API_BASE}/fx/usd-gtq`);
+  return handleResponse<{
+    pair: string;
+    rate: number;
+    live: boolean;
+    source: string;
+    updated_at: string;
+  }>(response);
+}
+
 export async function fetchSales(params?: {
   ticker?: string;
   from_date?: string;
@@ -157,6 +177,42 @@ export async function createSale(data: SaleCreate): Promise<Sale> {
     body: JSON.stringify(data),
   });
   return handleResponse<Sale>(response);
+}
+
+export async function fetchDeposits(): Promise<Deposit[]> {
+  const response = await fetch(`${API_BASE}/deposits`);
+  return handleResponse<Deposit[]>(response);
+}
+
+export async function createDeposit(data: DepositCreate): Promise<Deposit> {
+  const response = await fetch(`${API_BASE}/deposits`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<Deposit>(response);
+}
+
+export async function updateDeposit(
+  id: string,
+  data: Partial<DepositCreate>
+): Promise<Deposit> {
+  const response = await fetch(`${API_BASE}/deposits/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<Deposit>(response);
+}
+
+export async function deleteDeposit(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/deposits/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to delete" }));
+    throw new Error(error.detail);
+  }
 }
 
 export async function fetchMovements(params?: {

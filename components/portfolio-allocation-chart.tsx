@@ -2,7 +2,13 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import type { Investment } from "@/lib/types";
-import { convertUsdToGtq, formatCurrency, formatPercentage, getCurrentPrice } from "@/lib/utils";
+import {
+  convertUsdToGtq,
+  formatCurrency,
+  formatPercentage,
+  getCurrentPrice,
+  normalizeTicker,
+} from "@/lib/utils";
 
 interface PortfolioAllocationChartProps {
   investments: Investment[];
@@ -32,12 +38,24 @@ export function PortfolioAllocationChart({
   investments,
   prices,
 }: PortfolioAllocationChartProps) {
-  const items = investments.map((inv) => {
+  const merged = new Map<string, { name: string; valueUsd: number }>();
+  for (const inv of investments) {
+    const key = normalizeTicker(inv.ticker);
     const currentPrice = getCurrentPrice(prices, inv.ticker, inv.buy_price);
     const valueUsd = inv.amount * currentPrice;
-    const valueGtq = convertUsdToGtq(valueUsd);
-    return { name: inv.ticker, valueUsd, valueGtq, value: valueUsd };
-  });
+    const prev = merged.get(key);
+    if (prev) {
+      prev.valueUsd += valueUsd;
+    } else {
+      merged.set(key, { name: key, valueUsd });
+    }
+  }
+  const items = [...merged.values()].map((m) => ({
+    name: m.name,
+    valueUsd: m.valueUsd,
+    valueGtq: convertUsdToGtq(m.valueUsd),
+    value: m.valueUsd,
+  }));
 
   const totalUsd = items.reduce((sum, item) => sum + item.valueUsd, 0);
 

@@ -1,6 +1,15 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Wallet, DollarSign, BarChart3 } from "lucide-react";
+import {
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  DollarSign,
+  BarChart3,
+  PiggyBank,
+  Landmark,
+  Coins,
+} from "lucide-react";
 import { cn, convertUsdToGtq, formatCurrency, formatPercentage } from "@/lib/utils";
 
 interface PortfolioSummaryProps {
@@ -10,6 +19,11 @@ interface PortfolioSummaryProps {
   pnlPercentage: number;
   totalRealizedPnl?: number;
   totalUnrealizedPnl?: number;
+  totalDeposited?: number;
+  totalSpentOnBuys?: number;
+  totalReceivedFromSales?: number;
+  estimatedCash?: number;
+  estimatedNetWorth?: number;
 }
 
 export function PortfolioSummary({
@@ -19,9 +33,20 @@ export function PortfolioSummary({
   pnlPercentage,
   totalRealizedPnl,
   totalUnrealizedPnl,
+  totalDeposited,
+  totalSpentOnBuys,
+  totalReceivedFromSales,
+  estimatedCash,
+  estimatedNetWorth,
 }: PortfolioSummaryProps) {
   const isPositive = totalPnl >= 0;
   const hasBreakdown = totalRealizedPnl != null && totalUnrealizedPnl != null;
+  const hasFunding =
+    totalDeposited != null &&
+    estimatedCash != null &&
+    estimatedNetWorth != null &&
+    totalSpentOnBuys != null &&
+    totalReceivedFromSales != null;
 
   const totalInvestedGtq = convertUsdToGtq(totalInvested);
   const currentValueGtq = convertUsdToGtq(currentValue);
@@ -80,6 +105,47 @@ export function PortfolioSummary({
           />
         </div>
       )}
+
+      {hasFunding && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold text-foreground">Depósitos y saldo</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <SummaryCard
+              title="Total depositado"
+              value={formatCurrency(totalDeposited, "USD")}
+              secondary={formatCurrency(convertUsdToGtq(totalDeposited), "GTQ")}
+              icon={<PiggyBank className="h-5 w-5" />}
+              variant="default"
+            />
+            <SummaryCard
+              title="Efectivo estimado"
+              value={formatCurrency(estimatedCash, "USD")}
+              secondary={formatCurrency(convertUsdToGtq(estimatedCash), "GTQ")}
+              icon={<Coins className="h-5 w-5" />}
+              variant={estimatedCash >= 0 ? "default" : "destructive"}
+            />
+            <SummaryCard
+              title="Patrimonio estimado"
+              value={formatCurrency(estimatedNetWorth, "USD")}
+              secondary={formatCurrency(convertUsdToGtq(estimatedNetWorth), "GTQ")}
+              icon={<Landmark className="h-5 w-5" />}
+              variant="default"
+            />
+            <SummaryCard
+              title="Compras / ventas (flujo)"
+              value={formatCurrency(totalSpentOnBuys, "USD")}
+              secondary={`Ventas +${formatCurrency(totalReceivedFromSales, "USD")} · ${formatCurrency(convertUsdToGtq(totalReceivedFromSales), "GTQ")}`}
+              icon={<Wallet className="h-5 w-5" />}
+              variant="default"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Efectivo estimado = depósitos (capital neto) − total invertido en compras + ingresos
+            por ventas del ciclo actual. Patrimonio estimado = efectivo + valor actual del portafolio. Las comisiones de bolsa por
+            operación no están modeladas; si las añades como líneas de depósito o ajustas compras, cuadrará mejor.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -109,10 +175,10 @@ function SummaryCard({ title, value, secondary, prefix, icon, variant }: Summary
           {icon}
         </div>
       </div>
-      <div className="mt-3 space-y-1">
+      <div className="mt-3 space-y-1.5">
         <p
           className={cn(
-            "text-2xl font-bold tracking-tight",
+            "text-3xl font-bold tracking-tight",
             variant === "success" && "text-success",
             variant === "destructive" && "text-destructive",
             variant === "default" && "text-card-foreground"
@@ -122,7 +188,7 @@ function SummaryCard({ title, value, secondary, prefix, icon, variant }: Summary
           {value}
         </p>
         {secondary && (
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <p className="text-sm font-medium text-muted-foreground">
             {secondary}
           </p>
         )}

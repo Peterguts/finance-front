@@ -4,8 +4,9 @@ import { useState, useMemo } from "react";
 import useSWR from "swr";
 import { Loader2, Filter, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
-import { fetchMovements, fetchPortfolioSummary } from "@/lib/api";
-import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { fetchMovements, fetchPortfolioSummary, fetchUsdGtqRate } from "@/lib/api";
+import { cn, convertUsdToGtq, formatCurrency, formatNumber, setUsdToGtqRate } from "@/lib/utils";
+import { useEffect } from "react";
 
 function getDefaultFromDate(): string {
   const d = new Date();
@@ -24,6 +25,7 @@ export default function ReportesPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "buy" | "sell">("all");
 
   const { data: portfolio } = useSWR("portfolio", fetchPortfolioSummary, { refreshInterval: 30000 });
+  const { data: fxRate } = useSWR("fx-usd-gtq", fetchUsdGtqRate, { refreshInterval: 300000 });
   const tickers = useMemo(() => {
     const fromPos = portfolio?.positions?.map((p) => p.ticker) ?? [];
     const fromInv = portfolio?.investments?.map((i) => i.ticker) ?? [];
@@ -51,9 +53,17 @@ export default function ReportesPage() {
     mutate();
   };
 
+  useEffect(() => {
+    if (fxRate?.rate) setUsdToGtqRate(fxRate.rate);
+  }, [fxRate?.rate]);
+
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader onRefresh={handleRefresh} isRefreshing={isLoading} />
+      <AppHeader
+        onRefresh={handleRefresh}
+        isRefreshing={isLoading}
+        fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
+      />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         <div className="mb-6">
@@ -213,10 +223,16 @@ export default function ReportesPage() {
                           {formatNumber(m.quantity)}
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-sm">
-                          {formatCurrency(m.price, "USD")}
+                          <div>{formatCurrency(m.price, "USD")}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatCurrency(convertUsdToGtq(m.price), "GTQ")}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-sm font-medium">
-                          {formatCurrency(m.amount, "USD")}
+                          <div>{formatCurrency(m.amount, "USD")}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatCurrency(convertUsdToGtq(m.amount), "GTQ")}
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right">
                           {m.realized_pnl != null ? (
@@ -228,6 +244,9 @@ export default function ReportesPage() {
                             >
                               {m.realized_pnl >= 0 ? "+" : ""}
                               {formatCurrency(m.realized_pnl, "USD")}
+                              <span className="block text-xs text-muted-foreground">
+                                {formatCurrency(Math.abs(convertUsdToGtq(m.realized_pnl)), "GTQ")}
+                              </span>
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>

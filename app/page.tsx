@@ -10,12 +10,21 @@ import { AppHeader } from "@/components/app-header";
 import { AddInvestmentForm } from "@/components/add-investment-form";
 import { InvestmentList } from "@/components/investment-list";
 import {
+  fetchUsdGtqRate,
+  fetchDeposits,
   fetchMovements,
   fetchPortfolioSummary,
   fetchPricesForTickers,
   fetchPricesStatus,
 } from "@/lib/api";
-import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import {
+  cn,
+  convertUsdToGtq,
+  formatCurrency,
+  formatNumber,
+  normalizeTicker,
+  setUsdToGtqRate,
+} from "@/lib/utils";
 import type { Investment, PortfolioPosition } from "@/lib/types";
 
 function getDefaultFromDate(): string {
@@ -53,6 +62,7 @@ export default function DashboardPage() {
   const { data: pricesStatus } = useSWR("prices-status", fetchPricesStatus, {
     refreshInterval: 60000,
   });
+  const { data: fxRate } = useSWR("fx-usd-gtq", fetchUsdGtqRate, { refreshInterval: 300000 });
 
   const [fromDate, setFromDate] = useState(getDefaultFromDate);
   const [toDate, setToDate] = useState(getDefaultToDate);
@@ -66,23 +76,14 @@ export default function DashboardPage() {
     }, {} as Record<string, PortfolioPosition>);
 
   const investmentsForTable: Investment[] = useMemo(() => {
-    const positions = portfolio?.positions ?? [];
-    return positions
-      .filter((pos) => pos.quantity > 0)
-      .map((pos) => {
-        const baseInv =
-          portfolio?.investments.find(
-            (inv) => inv.ticker.toUpperCase() === pos.ticker.toUpperCase()
-          ) ?? null;
-        const avgPrice = pos.quantity > 0 ? pos.cost_basis / pos.quantity : 0;
-        return {
-          id: baseInv?.id ?? pos.ticker,
-          ticker: pos.ticker,
-          amount: pos.quantity,
-          buy_price: avgPrice,
-          timestamp: baseInv?.timestamp ?? "",
-        };
-      });
+    const open = new Set(
+      (portfolio?.positions ?? [])
+        .filter((p) => p.quantity > 0)
+        .map((p) => normalizeTicker(p.ticker))
+    );
+    return (portfolio?.investments ?? []).filter((inv) =>
+      open.has(normalizeTicker(inv.ticker))
+    );
   }, [portfolio]);
 
   const tickersForReports = useMemo(() => {
@@ -112,6 +113,11 @@ export default function DashboardPage() {
     () => fetchMovements(params),
     { refreshInterval: 60000 }
   );
+  const { data: deposits, isLoading: depositsLoading, error: depositsError } = useSWR(
+    "deposits",
+    fetchDeposits,
+    { refreshInterval: 60000 }
+  );
 
   const isLoading = portfolioLoading || pricesLoading;
   const error = portfolioError;
@@ -134,9 +140,20 @@ export default function DashboardPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    if (fxRate?.rate) {
+      setUsdToGtqRate(fxRate.rate);
+    }
+  }, [fxRate?.rate]);
+
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader onRefresh={handleRefresh} isRefreshing={portfolioLoading || pricesLoading} />
+      <AppHeader
+        onRefresh={handleRefresh}
+        isRefreshing={portfolioLoading || pricesLoading}
+        fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
+      />
+      
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 space-y-12">
         {error ? (
@@ -182,7 +199,82 @@ export default function DashboardPage() {
                 pnlPercentage={portfolio.pnl_percentage}
                 totalRealizedPnl={portfolio.total_realized_pnl}
                 totalUnrealizedPnl={portfolio.total_unrealized_pnl}
+                totalDeposited={portfolio.total_deposited}
+                totalSpentOnBuys={portfolio.total_spent_on_buys}
+                totalReceivedFromSales={portfolio.total_received_from_sales}
+                estimatedCash={portfolio.estimated_cash}
+                estimatedNetWorth={portfolio.estimated_net_worth}
               />
+            </section>
+
+            <section id="depositos-resumen" className="scroll-mt-24">
+              <h2 className="text-base font-bold text-foreground mb-1">
+                Depósitos recientes
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Últimos fondos ingresados para tu capital de inversión.
+              </p>
+              {depositsError ? (
+                <div className="rounded-xl border border-border bg-card p-6 text-sm text-destructive">
+                  No se pudieron cargar los depósitos.
+                </div>
+              ) : depositsLoading ? (
+                <div className="rounded-xl border border-border bg-card p-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border bg-card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/50">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Fecha
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Monto
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Comisión
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(deposits ?? []).slice(0, 5).map((d) => (
+                          <tr
+                            key={d.id}
+                            className="border-b border-border last:border-b-0 hover:bg-muted/30 transition-colors"
+                          >
+                            <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{d.date}</td>
+                            <td className="px-4 py-3 text-right font-mono text-sm">
+                              <div>{formatCurrency(d.amount, "USD")}</div>
+                              <div className="text-xs text-muted-foreground">{formatCurrency(convertUsdToGtq(d.amount), "GTQ")}</div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-sm">
+                              <div>{formatNumber(d.commission_pct, 2)}% · {formatCurrency(d.commission_amount, "USD")}</div>
+                              <div className="text-xs text-muted-foreground">{formatCurrency(convertUsdToGtq(d.commission_amount), "GTQ")}</div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-sm font-medium">
+                              <div>{formatCurrency(d.total, "USD")}</div>
+                              <div className="text-xs text-muted-foreground">{formatCurrency(convertUsdToGtq(d.total), "GTQ")}</div>
+                            </td>
+                          </tr>
+                        ))}
+                        {(deposits ?? []).length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                              Aún no tienes depósitos registrados.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section id="distribucion" className="scroll-mt-24">
@@ -285,7 +377,7 @@ export default function DashboardPage() {
                           >
                             {mainPnlVariant === "muted"
                               ? "Pendiente"
-                              : `${mainPnlValue > 0 ? "+" : ""}${formatCurrency(mainPnlValue, "USD")}`}
+                              : `${mainPnlValue > 0 ? "+" : ""}${formatCurrency(mainPnlValue, "USD")} · ${formatCurrency(Math.abs(convertUsdToGtq(mainPnlValue)), "GTQ")}`}
                           </span>
                         </div>
 
@@ -296,9 +388,9 @@ export default function DashboardPage() {
                             </p>
                             <p className="mt-1 font-mono text-sm text-foreground">
                               {hasPosition
-                                ? formatCurrency(pos.current_value, "USD")
+                                ? `${formatCurrency(pos.current_value, "USD")} · ${formatCurrency(convertUsdToGtq(pos.current_value), "GTQ")}`
                                 : soldQty > 0
-                                  ? formatCurrency(avgSellPrice, "USD")
+                                  ? `${formatCurrency(avgSellPrice, "USD")} · ${formatCurrency(convertUsdToGtq(avgSellPrice), "GTQ")}`
                                   : ""}
                             </p>
                           </div>
@@ -308,9 +400,9 @@ export default function DashboardPage() {
                             </p>
                             <p className="mt-1 font-mono text-sm text-foreground">
                               {hasPosition
-                                ? formatCurrency(pos.cost_basis, "USD")
+                                ? `${formatCurrency(pos.cost_basis, "USD")} · ${formatCurrency(convertUsdToGtq(pos.cost_basis), "GTQ")}`
                                 : soldQty > 0
-                                  ? formatCurrency(inferredAvgCost, "USD")
+                                  ? `${formatCurrency(inferredAvgCost, "USD")} · ${formatCurrency(convertUsdToGtq(inferredAvgCost), "GTQ")}`
                                   : ""}
                             </p>
                           </div>
@@ -327,7 +419,7 @@ export default function DashboardPage() {
                                 )}
                               >
                                 {pos.unrealized_pnl > 0 ? "+" : ""}
-                                {formatCurrency(pos.unrealized_pnl, "USD")}
+                                {formatCurrency(pos.unrealized_pnl, "USD")} · {formatCurrency(Math.abs(convertUsdToGtq(pos.unrealized_pnl)), "GTQ")}
                               </span>
                             ) : (
                               <span className="text-muted-foreground">
@@ -345,7 +437,7 @@ export default function DashboardPage() {
                                 )}
                               >
                                 {pos.realized_pnl > 0 ? "+" : ""}
-                                {formatCurrency(pos.realized_pnl, "USD")}
+                                {formatCurrency(pos.realized_pnl, "USD")} · {formatCurrency(Math.abs(convertUsdToGtq(pos.realized_pnl)), "GTQ")}
                               </span>
                             ) : (
                               <span className="text-muted-foreground">Pendiente</span>
@@ -546,10 +638,12 @@ export default function DashboardPage() {
                                 {formatNumber(m.quantity)}
                               </td>
                               <td className="px-4 py-3 text-right font-mono text-sm">
-                                {formatCurrency(m.price, "USD")}
+                                <div>{formatCurrency(m.price, "USD")}</div>
+                                <div className="text-xs text-muted-foreground">{formatCurrency(convertUsdToGtq(m.price), "GTQ")}</div>
                               </td>
                               <td className="px-4 py-3 text-right font-mono text-sm font-medium">
-                                {formatCurrency(m.amount, "USD")}
+                                <div>{formatCurrency(m.amount, "USD")}</div>
+                                <div className="text-xs text-muted-foreground">{formatCurrency(convertUsdToGtq(m.amount), "GTQ")}</div>
                               </td>
                               <td className="px-4 py-3 text-right">
                                 {m.realized_pnl != null ? (
@@ -560,7 +654,7 @@ export default function DashboardPage() {
                                     )}
                                   >
                                     {m.realized_pnl >= 0 ? "+" : ""}
-                                    {formatCurrency(m.realized_pnl, "USD")}
+                                    {formatCurrency(m.realized_pnl, "USD")} · {formatCurrency(Math.abs(convertUsdToGtq(m.realized_pnl)), "GTQ")}
                                   </span>
                                 ) : (
                                   <span className="text-muted-foreground">—</span>

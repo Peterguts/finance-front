@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, TrendingUp, TrendingDown, Loader2, TrendingDown as SellIcon } from "lucide-react";
+import {
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  Loader2,
+  TrendingDown as SellIcon,
+  Pencil,
+} from "lucide-react";
 import type { Investment, PortfolioPosition } from "@/lib/types";
 import {
   cn,
@@ -10,8 +17,9 @@ import {
   formatNumber,
   formatPercentage,
   getCurrentPrice,
+  normalizeTicker,
 } from "@/lib/utils";
-import { createSale, deleteInvestment, fetchPrice } from "@/lib/api";
+import { createSale, deleteInvestment, fetchPrice, updateInvestment } from "@/lib/api";
 
 interface InvestmentListProps {
   investments: Investment[];
@@ -26,6 +34,47 @@ export function InvestmentList({
   positionsByTicker,
   onChange,
 }: InvestmentListProps) {
+  const groupedInvestments = Object.values(
+    investments.reduce((acc, inv) => {
+      const key = normalizeTicker(inv.ticker);
+      const prev = acc[key];
+      if (!prev) {
+        acc[key] = {
+          ticker: key,
+          amount: inv.amount,
+          invested: inv.amount * inv.buy_price,
+          timestamp: inv.timestamp || "",
+          ids: [inv.id],
+          source: inv,
+        };
+      } else {
+        prev.amount += inv.amount;
+        prev.invested += inv.amount * inv.buy_price;
+        if ((inv.timestamp || "") > (prev.timestamp || "")) {
+          prev.timestamp = inv.timestamp || "";
+          prev.source = inv;
+        }
+        prev.ids.push(inv.id);
+      }
+      return acc;
+    }, {} as Record<string, {
+      ticker: string;
+      amount: number;
+      invested: number;
+      timestamp: string;
+      ids: string[];
+      source: Investment;
+    }>)
+  ).map((g) => ({
+    id: g.source.id,
+    ticker: g.ticker,
+    amount: g.amount,
+    buy_price: g.amount > 0 ? g.invested / g.amount : 0,
+    timestamp: g.timestamp,
+    canEdit: g.ids.length === 1,
+    canDelete: g.ids.length === 1,
+  }));
+
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sellingTicker, setSellingTicker] = useState<string | null>(null);
   const [sellQuantity, setSellQuantity] = useState<string>("");
@@ -33,6 +82,11 @@ export function InvestmentList({
   const [sellError, setSellError] = useState<string | null>(null);
   const [isSelling, setIsSelling] = useState(false);
   const [priceLoading, setPriceLoading] = useState(false);
+  const [editingInvestment, setEditingInvestment] = useState<Investment | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editBuyPrice, setEditBuyPrice] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
@@ -66,6 +120,56 @@ export function InvestmentList({
       // ignorar, el usuario puede escribir el precio
     } finally {
       setPriceLoading(false);
+    }
+  };
+
+  const openEditModal = (inv: Investment & { canEdit?: boolean }) => {
+    if (!inv.canEdit) {
+      setEditError("Esta posición tiene múltiples compras. Edita cada compra individual desde movimientos.");
+      return;
+    }
+    setEditError(null);
+    setEditingInvestment(inv);
+    setEditAmount(String(inv.amount));
+    setEditBuyPrice(String(inv.buy_price));
+  };
+
+  const closeEditModal = () => {
+    setEditingInvestment(null);
+    setEditAmount("");
+    setEditBuyPrice("");
+    setEditError(null);
+    setIsSavingEdit(false);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvestment) return;
+    setEditError(null);
+    const qty = parseFloat(editAmount);
+    const priceNum = parseFloat(editBuyPrice);
+    if (Number.isNaN(qty) || qty <= 0) {
+      setEditError("La cantidad debe ser un número positivo.");
+      return;
+    }
+    if (Number.isNaN(priceNum) || priceNum <= 0) {
+      setEditError("El precio de compra debe ser un número positivo.");
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      await updateInvestment(editingInvestment.id, {
+        amount: qty,
+        buy_price: priceNum,
+      });
+      closeEditModal();
+      onChange();
+    } catch (err) {
+      setEditError(
+        err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo."
+      );
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -105,7 +209,7 @@ export function InvestmentList({
     setIsSelling(true);
     try {
       await createSale({
-        ticker: sellingTicker.trim().toUpperCase(),
+        ticker: normalizeTicker(sellingTicker.trim()),
         quantity: qty,
         sell_price: priceNum,
       });
@@ -121,7 +225,7 @@ export function InvestmentList({
     }
   };
 
-  if (investments.length === 0) {
+  if (groupedInvestments.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-12 text-center">
         <p className="text-muted-foreground">Aún no hay inversiones. Añade la primera arriba.</p>
@@ -133,7 +237,7 @@ export function InvestmentList({
     <>
       {/* Mobile: tarjetas */}
       <div className="grid gap-3 sm:hidden">
-        {investments.map((investment) => {
+        {groupedInvestments.map((investment) => {
           const currentPrice = getCurrentPrice(prices, investment.ticker, investment.buy_price);
           const investedValueUsd = investment.amount * investment.buy_price;
           const currentValueUsd = investment.amount * currentPrice;
@@ -173,6 +277,16 @@ export function InvestmentList({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => openEditModal(investment)}
+                    disabled={!investment.canEdit}
+                    className="inline-flex items-center justify-center rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+                    title={!investment.canEdit ? "Múltiples compras para este ticker" : "Editar"}
+                  >
+                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                    Editar
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => openSellModal(investment.ticker)}
                     className="inline-flex items-center justify-center rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
                   >
@@ -182,9 +296,10 @@ export function InvestmentList({
                   <button
                     type="button"
                     onClick={() => handleDelete(investment.id)}
-                    disabled={deletingId === investment.id}
+                    disabled={deletingId === investment.id || !investment.canDelete}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
                     aria-label={`Eliminar ${investment.ticker}`}
+                    title={!investment.canDelete ? "Múltiples compras para este ticker" : "Eliminar"}
                   >
                     {deletingId === investment.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -216,12 +331,14 @@ export function InvestmentList({
                     Compra
                   </p>
                   <p className="mt-1 font-mono text-sm text-foreground">{formatCurrency(investment.buy_price, "USD")}</p>
+                  <p className="text-[11px] text-muted-foreground">{formatCurrency(convertUsdToGtq(investment.buy_price), "GTQ")}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Actual
                   </p>
                   <p className="mt-1 font-mono text-sm text-foreground">{formatCurrency(currentPrice, "USD")}</p>
+                  <p className="text-[11px] text-muted-foreground">{formatCurrency(convertUsdToGtq(currentPrice), "GTQ")}</p>
                 </div>
               </div>
 
@@ -230,7 +347,7 @@ export function InvestmentList({
                 <div className="text-right">
                   <p
                     className={cn(
-                      "font-mono text-sm font-semibold",
+                      "font-mono text-base font-semibold",
                       isPositive && "text-success",
                       isNegative && "text-destructive",
                       !isPositive && !isNegative && "text-muted-foreground"
@@ -240,6 +357,10 @@ export function InvestmentList({
                     {formatCurrency(pnlUsd, "USD")}
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground">
+                    {pnlUsd > 0 ? "+" : ""}
+                    {formatCurrency(convertUsdToGtq(pnlUsd), "GTQ")}
+                  </p>
+                  <p className="text-[11px] font-mono text-muted-foreground/80">
                     {pnlPercent !== 0 ? formatPercentage(pnlPercent) : "Pendiente"}
                   </p>
                 </div>
@@ -279,7 +400,7 @@ export function InvestmentList({
               </tr>
             </thead>
             <tbody>
-              {investments.map((investment) => {
+              {groupedInvestments.map((investment) => {
                 const currentPrice = getCurrentPrice(
                   prices,
                   investment.ticker,
@@ -329,10 +450,16 @@ export function InvestmentList({
                       {formatNumber(investment.amount)}
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-sm text-foreground">
-                      {formatCurrency(investment.buy_price, "USD")}
+                      <div>{formatCurrency(investment.buy_price, "USD")}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatCurrency(convertUsdToGtq(investment.buy_price), "GTQ")}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-sm text-foreground">
-                      {formatCurrency(currentPrice, "USD")}
+                      <div>{formatCurrency(currentPrice, "USD")}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatCurrency(convertUsdToGtq(currentPrice), "GTQ")}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-sm font-medium text-foreground">
                       <div>{formatCurrency(currentValueUsd, "USD")}</div>
@@ -347,14 +474,15 @@ export function InvestmentList({
                           isPositive ? "text-success" : "text-destructive"
                         )}
                       >
+                        <span className="font-mono text-base font-semibold">
+                          {isPositive ? "+" : ""}
+                          {formatCurrency(pnlUsd, "USD")}
+                        </span>
                         {isPositive ? (
                           <TrendingUp className="h-4 w-4" />
                         ) : (
                           <TrendingDown className="h-4 w-4" />
                         )}
-                        <span className="font-mono text-sm font-medium">
-                          {formatPercentage(pnlPercent)}
-                        </span>
                       </div>
                       <p
                         className={cn(
@@ -363,15 +491,25 @@ export function InvestmentList({
                         )}
                       >
                         {isPositive ? "+" : ""}
-                        {formatCurrency(pnlUsd, "USD")}
+                        {formatCurrency(pnlGtq, "GTQ")}
                       </p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {isPositive ? "+" : ""}
-                        {formatCurrency(pnlGtq, "GTQ")}
+                        {formatPercentage(pnlPercent)}
                       </p>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(investment)}
+                          disabled={!investment.canEdit}
+                          className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+                          aria-label={`Editar ${investment.ticker}`}
+                          title={!investment.canEdit ? "Múltiples compras para este ticker" : "Editar"}
+                        >
+                          <Pencil className="mr-1 h-3.5 w-3.5" />
+                          Editar
+                        </button>
                         <button
                           type="button"
                           onClick={() => openSellModal(investment.ticker)}
@@ -384,9 +522,10 @@ export function InvestmentList({
                         <button
                           type="button"
                           onClick={() => handleDelete(investment.id)}
-                          disabled={deletingId === investment.id}
+                          disabled={deletingId === investment.id || !investment.canDelete}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                           aria-label={`Eliminar ${investment.ticker}`}
+                          title={!investment.canDelete ? "Múltiples compras para este ticker" : "Eliminar"}
                         >
                           {deletingId === investment.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -403,6 +542,105 @@ export function InvestmentList({
           </table>
         </div>
       </div>
+      {editingInvestment && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 px-4">
+          <form
+            onSubmit={handleSaveEdit}
+            className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-lg"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-foreground">
+                  Editar compra · {editingInvestment.ticker}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Actualiza cantidad y precio de esta operación.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Cerrar
+              </button>
+            </div>
+            {editError && (
+              <div className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {editError}
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="edit-amount"
+                  className="mb-1 block text-xs font-medium text-muted-foreground"
+                >
+                  Cantidad
+                </label>
+                <input
+                  id="edit-amount"
+                  type="number"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  step="any"
+                  min="0"
+                  className={cn(
+                    "w-full rounded-md border bg-input px-3 py-2 text-sm",
+                    "focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  )}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-buy-price"
+                  className="mb-1 block text-xs font-medium text-muted-foreground"
+                >
+                  Precio compra ($)
+                </label>
+                <input
+                  id="edit-buy-price"
+                  type="number"
+                  value={editBuyPrice}
+                  onChange={(e) => setEditBuyPrice(e.target.value)}
+                  step="any"
+                  min="0"
+                  className={cn(
+                    "w-full rounded-md border bg-input px-3 py-2 text-sm",
+                    "focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  )}
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingEdit}
+                className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
+              >
+                {isSavingEdit ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Guardando…
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-3.5 w-3.5" />
+                    Guardar
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       {sellingTicker && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 px-4">
           <form

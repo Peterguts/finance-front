@@ -5,8 +5,15 @@ import { Loader2 } from "lucide-react";
 import { InvestmentList } from "@/components/investment-list";
 import { AddInvestmentForm } from "@/components/add-investment-form";
 import { AppHeader } from "@/components/app-header";
-import { fetchPortfolioSummary, fetchPricesForTickers, fetchPricesStatus } from "@/lib/api";
+import {
+  fetchPortfolioSummary,
+  fetchPricesForTickers,
+  fetchPricesStatus,
+  fetchUsdGtqRate,
+} from "@/lib/api";
 import type { PortfolioPosition } from "@/lib/types";
+import { formatNumber, setUsdToGtqRate } from "@/lib/utils";
+import { useEffect } from "react";
 
 export default function InversionesPage() {
   const {
@@ -29,6 +36,7 @@ export default function InversionesPage() {
   const { data: pricesStatus } = useSWR("prices-status", fetchPricesStatus, {
     refreshInterval: 60000,
   });
+  const { data: fxRate } = useSWR("fx-usd-gtq", fetchUsdGtqRate, { refreshInterval: 300000 });
 
   const positionsByTicker: Record<string, PortfolioPosition> =
     (portfolio?.positions ?? []).reduce((acc, pos) => {
@@ -41,9 +49,17 @@ export default function InversionesPage() {
     mutatePrices();
   };
 
+  useEffect(() => {
+    if (fxRate?.rate) setUsdToGtqRate(fxRate.rate);
+  }, [fxRate?.rate]);
+
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader onRefresh={handleRefresh} isRefreshing={isLoading} />
+      <AppHeader
+        onRefresh={handleRefresh}
+        isRefreshing={isLoading}
+        fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
+      />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
         {error ? (

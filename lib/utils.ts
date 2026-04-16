@@ -5,10 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const USD_TO_GTQ = 7.8;
+export const DEFAULT_USD_TO_GTQ =
+  Number.parseFloat(process.env.NEXT_PUBLIC_USD_TO_GTQ_RATE || "") || 7.75;
+let usdToGtqRate = DEFAULT_USD_TO_GTQ;
 
 export function convertUsdToGtq(value: number): number {
-  return value * USD_TO_GTQ;
+  return value * usdToGtqRate;
+}
+
+export function setUsdToGtqRate(rate: number): void {
+  if (Number.isFinite(rate) && rate > 0) {
+    usdToGtqRate = rate;
+  }
 }
 
 export type SupportedCurrency = "USD" | "GTQ";
@@ -16,7 +24,7 @@ export type SupportedCurrency = "USD" | "GTQ";
 export function formatCurrency(
   value: number,
   currency: SupportedCurrency = "USD",
-  decimals: number = 4
+  decimals: number = 2
 ): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -26,7 +34,7 @@ export function formatCurrency(
   }).format(value);
 }
 
-export function formatPercentage(value: number, decimals: number = 4): string {
+export function formatPercentage(value: number, decimals: number = 2): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(decimals)}%`;
 }
@@ -48,12 +56,23 @@ export function getCurrentPrice(
   ticker: string,
   fallback: number
 ): number {
+  const canon = normalizeTicker(ticker);
   if (prices[ticker] != null && !Number.isNaN(prices[ticker])) {
     return prices[ticker];
+  }
+  if (prices[canon] != null && !Number.isNaN(prices[canon])) {
+    return prices[canon];
   }
   const upper = ticker.toUpperCase();
   if (prices[upper] != null && !Number.isNaN(prices[upper])) {
     return prices[upper];
   }
   return fallback;
+}
+
+/** Alineado con el backend: un solo símbolo para LINK. */
+export function normalizeTicker(ticker: string): string {
+  const t = (ticker || "").trim().toUpperCase();
+  if (t === "LINKUSD" || t === "LINK-USD") return "LINK-USD";
+  return t;
 }
