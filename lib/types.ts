@@ -82,3 +82,31 @@ export interface Movement {
   created_at: string;
   realized_pnl: number | null;
 }
+
+export interface SimulatorAsset {
+  ticker: string;
+  quantity: number;
+  avg_buy_price: number;
+  cost_basis: number;
+  current_price: number;
+  current_value: number;
+  unrealized_pnl: number;
+}
+
+export interface SimulatorHistoryPoint {
+  date: string;
+  close: number;
+}
+
+export interface SimulatorScenarioResult {
+  ticker: string;
+  change_pct: number;
+  quantity: number;
+  cost_basis: number;
+  current_price: number;
+  projected_price: number;
+  current_value: number;
+  projected_value: number;
+  pnl: number;
+  roi_pct: number;
+}

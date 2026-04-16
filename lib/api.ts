@@ -7,6 +7,9 @@ import type {
   PortfolioSummary,
   Sale,
   SaleCreate,
+  SimulatorAsset,
+  SimulatorHistoryPoint,
+  SimulatorScenarioResult,
 } from "./types";
 
 const API_BASE =
@@ -231,4 +234,36 @@ export async function fetchMovements(params?: {
   const qs = search.toString();
   const response = await fetch(`${API_BASE}/movements${qs ? `?${qs}` : ""}`);
   return handleResponse<Movement[]>(response);
+}
+
+export async function fetchSimulatorAssets(): Promise<SimulatorAsset[]> {
+  const response = await fetch(`${API_BASE}/simulator/assets`);
+  return handleResponse<SimulatorAsset[]>(response);
+}
+
+export async function fetchSimulatorHistory(
+  ticker: string,
+  params?: { period?: string; interval?: string; limit?: number }
+): Promise<SimulatorHistoryPoint[]> {
+  const search = new URLSearchParams();
+  if (params?.period) search.set("period", params.period);
+  if (params?.interval) search.set("interval", params.interval);
+  if (params?.limit != null) search.set("limit", String(params.limit));
+  const qs = search.toString();
+  const response = await fetch(
+    `${API_BASE}/simulator/history/${encodeURIComponent(ticker)}${qs ? `?${qs}` : ""}`
+  );
+  return handleResponse<SimulatorHistoryPoint[]>(response);
+}
+
+export async function simulateScenario(input: {
+  ticker: string;
+  change_pct: number;
+}): Promise<SimulatorScenarioResult> {
+  const response = await fetch(`${API_BASE}/simulator/scenario`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return handleResponse<SimulatorScenarioResult>(response);
 }

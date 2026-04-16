@@ -8,6 +8,7 @@ import {
   List,
   RefreshCw,
   PieChart,
+  BarChart3,
   FileText,
   Menu,
   X,
@@ -59,6 +60,7 @@ export function AppHeader({ onRefresh, isRefreshing, fxRateLabel }: AppHeaderPro
     () => [
       { href: "/#resumen", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
       { href: "/#distribucion", label: "Distribución", icon: <PieChart className="h-4 w-4" /> },
+      { href: "/simulador", label: "Simulador", icon: <BarChart3 className="h-4 w-4" /> },
       { href: "/#inversiones", label: "Inversiones", icon: <List className="h-4 w-4" /> },
       { href: "/#reportes", label: "Reportes", icon: <FileText className="h-4 w-4" /> },
       { href: "/depositos", label: "Depósitos", icon: <PiggyBank className="h-4 w-4" /> },
