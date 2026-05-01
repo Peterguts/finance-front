@@ -73,6 +73,6 @@ export function getCurrentPrice(
 /** Alineado con el backend: un solo símbolo para LINK. */
 export function normalizeTicker(ticker: string): string {
   const t = (ticker || "").trim().toUpperCase();
-  if (t === "LINKUSD" || t === "LINK-USD") return "LINK-USD";
+  if (t === "LINKUSD" || t === "LINK-USD" || t === "LINK") return "LINK-USD";
   return t;
 }

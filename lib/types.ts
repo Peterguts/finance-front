@@ -17,6 +17,8 @@ export interface PortfolioSummary {
   total_spent_on_buys?: number;
   total_received_from_sales?: number;
   estimated_cash?: number;
+  estimated_cash_before_adjustment?: number;
+  cash_adjustment_usd?: number;
   estimated_net_worth?: number;
   investments: Investment[];
   positions?: PortfolioPosition[];
@@ -46,6 +48,10 @@ export interface PortfolioPosition {
   current_value: number;
   unrealized_pnl: number;
   realized_pnl: number;
+  /** Compras acumuladas registradas (todas las compras del ticker). */
+  total_bought_quantity?: number;
+  /** Ventas acumuladas registradas; si hay ventas y sigue posición abierta, hubo venta parcial. */
+  total_sold_quantity?: number;
 }
 
 export interface InvestmentCreate {

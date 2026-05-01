@@ -1,14 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import { useEffect } from "react";
-import { Loader2, AlertTriangle, Filter, ArrowDownCircle, ArrowUpCircle, ArrowUp } from "lucide-react";
+import {
+  Loader2,
+  AlertTriangle,
+  Filter,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  ArrowUp,
+  PiggyBank,
+} from "lucide-react";
 import { PortfolioSummary } from "@/components/portfolio-summary";
 import { PortfolioAllocationChart } from "@/components/portfolio-allocation-chart";
 import { AppHeader } from "@/components/app-header";
 import { AddInvestmentForm } from "@/components/add-investment-form";
 import { InvestmentList } from "@/components/investment-list";
+import { MovementSellActions } from "@/components/movement-sell-actions";
 import {
   fetchUsdGtqRate,
   fetchDeposits,
@@ -25,7 +35,7 @@ import {
   normalizeTicker,
   setUsdToGtqRate,
 } from "@/lib/utils";
-import type { Investment, PortfolioPosition } from "@/lib/types";
+import type { PortfolioPosition } from "@/lib/types";
 
 function getDefaultFromDate(): string {
   const d = new Date();
@@ -75,7 +85,14 @@ export default function DashboardPage() {
       return acc;
     }, {} as Record<string, PortfolioPosition>);
 
-  const investmentsForTable: Investment[] = useMemo(() => {
+  const tickersForReports = useMemo(() => {
+    const fromPos = portfolio?.positions?.map((p) => p.ticker) ?? [];
+    const fromInv = portfolio?.investments?.map((i) => i.ticker) ?? [];
+    return [...new Set([...fromPos, ...fromInv])].filter(Boolean).sort();
+  }, [portfolio]);
+
+  /** Solo tickers con posición abierta: evita listar CRMD/LINK cerrados como «inversión actual». */
+  const investmentsOpenOnly = useMemo(() => {
     const open = new Set(
       (portfolio?.positions ?? [])
         .filter((p) => p.quantity > 0)
@@ -84,12 +101,6 @@ export default function DashboardPage() {
     return (portfolio?.investments ?? []).filter((inv) =>
       open.has(normalizeTicker(inv.ticker))
     );
-  }, [portfolio]);
-
-  const tickersForReports = useMemo(() => {
-    const fromPos = portfolio?.positions?.map((p) => p.ticker) ?? [];
-    const fromInv = portfolio?.investments?.map((i) => i.ticker) ?? [];
-    return [...new Set([...fromPos, ...fromInv])].filter(Boolean).sort();
   }, [portfolio]);
 
   const params = useMemo(
@@ -203,17 +214,28 @@ export default function DashboardPage() {
                 totalSpentOnBuys={portfolio.total_spent_on_buys}
                 totalReceivedFromSales={portfolio.total_received_from_sales}
                 estimatedCash={portfolio.estimated_cash}
+                estimatedCashBeforeAdjustment={portfolio.estimated_cash_before_adjustment}
+                cashAdjustmentUsd={portfolio.cash_adjustment_usd}
                 estimatedNetWorth={portfolio.estimated_net_worth}
               />
             </section>
 
             <section id="depositos-resumen" className="scroll-mt-24">
-              <h2 className="text-base font-bold text-foreground mb-1">
-                Depósitos recientes
-              </h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Últimos fondos ingresados para tu capital de inversión.
-              </p>
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-foreground mb-1">Depósitos recientes</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Últimos fondos ingresados para tu capital de inversión.
+                  </p>
+                </div>
+                <Link
+                  href="/depositos"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  <PiggyBank className="h-4 w-4" />
+                  Añadir depósito
+                </Link>
+              </div>
               {depositsError ? (
                 <div className="rounded-xl border border-border bg-card p-6 text-sm text-destructive">
                   No se pudieron cargar los depósitos.
@@ -282,27 +304,29 @@ export default function DashboardPage() {
                 Distribución del portafolio
               </h2>
               <p className="text-sm text-muted-foreground mb-4">
-                Cómo se reparte tu capital entre los distintos activos.
+                Solo posiciones abiertas (mismo criterio que «Valor actual» arriba). El efectivo no entra
+                en el pastel.
               </p>
-              <PortfolioAllocationChart
-                investments={portfolio.investments}
-                prices={pricesMap}
-              />
+              <PortfolioAllocationChart positions={portfolio.positions ?? []} />
             </section>
 
             <section id="inversiones" className="scroll-mt-24">
               <h2 className="text-base font-bold text-foreground mb-1">
                 Inversiones actuales
               </h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Añade nuevas posiciones o vende directamente desde la tabla. Esta vista muestra solo tus
-                activos, las ventas se reflejan en el área de reportes.
-              </p>
+              <p className="text-sm text-muted-foreground mb-4">Posiciones abiertas.</p>
               <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <AddInvestmentForm onSuccess={handleRefresh} />
+                <Link
+                  href="/depositos"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                >
+                  <PiggyBank className="h-4 w-4" />
+                  Añadir depósito
+                </Link>
               </div>
               <InvestmentList
-                investments={investmentsForTable}
+                investments={investmentsOpenOnly}
                 prices={pricesMap}
                 positionsByTicker={positionsByTicker}
                 onChange={handleRefresh}
@@ -593,13 +617,16 @@ export default function DashboardPage() {
                           <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             G/P realizado
                           </th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[100px]">
+                            Acciones
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {movements?.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={7}
+                              colSpan={8}
                               className="px-4 py-12 text-center text-sm text-muted-foreground"
                             >
                               No hay movimientos con los filtros seleccionados.
@@ -659,6 +686,9 @@ export default function DashboardPage() {
                                 ) : (
                                   <span className="text-muted-foreground">—</span>
                                 )}
+                              </td>
+                              <td className="px-4 py-3 text-right align-top">
+                                <MovementSellActions movement={m} onSuccess={handleRefresh} />
                               </td>
                             </tr>
                           ))

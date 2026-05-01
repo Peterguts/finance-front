@@ -1,18 +1,12 @@
 "use client";
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-import type { Investment } from "@/lib/types";
-import {
-  convertUsdToGtq,
-  formatCurrency,
-  formatPercentage,
-  getCurrentPrice,
-  normalizeTicker,
-} from "@/lib/utils";
+import type { PortfolioPosition } from "@/lib/types";
+import { convertUsdToGtq, formatCurrency, formatPercentage, normalizeTicker } from "@/lib/utils";
 
 interface PortfolioAllocationChartProps {
-  investments: Investment[];
-  prices: Record<string, number>;
+  /** Solo posiciones con cantidad > 0; usa current_value del backend (coherente con "Valor actual"). */
+  positions: PortfolioPosition[];
 }
 
 const CHART_COLORS = [
@@ -34,22 +28,20 @@ function colorForName(name: string): string {
   return CHART_COLORS[index];
 }
 
-export function PortfolioAllocationChart({
-  investments,
-  prices,
-}: PortfolioAllocationChartProps) {
+export function PortfolioAllocationChart({ positions }: PortfolioAllocationChartProps) {
   const merged = new Map<string, { name: string; valueUsd: number }>();
-  for (const inv of investments) {
-    const key = normalizeTicker(inv.ticker);
-    const currentPrice = getCurrentPrice(prices, inv.ticker, inv.buy_price);
-    const valueUsd = inv.amount * currentPrice;
+  for (const p of positions) {
+    if (p.quantity <= 0 || p.current_value <= 0) continue;
+    const key = normalizeTicker(p.ticker);
+    const add = p.current_value;
     const prev = merged.get(key);
     if (prev) {
-      prev.valueUsd += valueUsd;
+      prev.valueUsd += add;
     } else {
-      merged.set(key, { name: key, valueUsd });
+      merged.set(key, { name: key, valueUsd: add });
     }
   }
+
   const items = [...merged.values()].map((m) => ({
     name: m.name,
     valueUsd: m.valueUsd,
@@ -59,11 +51,11 @@ export function PortfolioAllocationChart({
 
   const totalUsd = items.reduce((sum, item) => sum + item.valueUsd, 0);
 
-  if (!investments.length || totalUsd <= 0) {
+  if (!items.length || totalUsd <= 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          Añade inversiones para ver la distribución del portafolio.
+          No hay posiciones abiertas con valor de mercado para mostrar la distribución.
         </p>
       </div>
     );
@@ -75,7 +67,7 @@ export function PortfolioAllocationChart({
     <div className="rounded-xl border border-border bg-card p-6">
       <h2 className="text-base font-semibold text-foreground mb-1">Distribución del portafolio</h2>
       <p className="text-sm text-muted-foreground mb-6">
-        Porcentaje del valor total por activo
+        Porcentaje del valor en acciones (posiciones abiertas al precio actual). No incluye efectivo.
       </p>
 
       <div className="h-[280px] w-full">
@@ -130,7 +122,7 @@ export function PortfolioAllocationChart({
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-        {sorted.map((item, index) => {
+        {sorted.map((item) => {
           const pct = (item.valueUsd / totalUsd) * 100;
           return (
             <div

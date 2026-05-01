@@ -23,6 +23,8 @@ interface PortfolioSummaryProps {
   totalSpentOnBuys?: number;
   totalReceivedFromSales?: number;
   estimatedCash?: number;
+  estimatedCashBeforeAdjustment?: number;
+  cashAdjustmentUsd?: number;
   estimatedNetWorth?: number;
 }
 
@@ -37,6 +39,8 @@ export function PortfolioSummary({
   totalSpentOnBuys,
   totalReceivedFromSales,
   estimatedCash,
+  estimatedCashBeforeAdjustment,
+  cashAdjustmentUsd,
   estimatedNetWorth,
 }: PortfolioSummaryProps) {
   const isPositive = totalPnl >= 0;
@@ -140,10 +144,23 @@ export function PortfolioSummary({
             />
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Efectivo estimado = depósitos (capital neto) − total invertido en compras + ingresos
-            por ventas del ciclo actual. Patrimonio estimado = efectivo + valor actual del portafolio. Las comisiones de bolsa por
-            operación no están modeladas; si las añades como líneas de depósito o ajustas compras, cuadrará mejor.
+            Efectivo (fórmula) = depósitos − compras + ingresos brutos por ventas. Si hay{" "}
+            <span className="font-medium text-foreground">ajuste de efectivo</span>, se suma al resultado
+            para alinear con tu saldo real (comisiones, redondeos). Patrimonio estimado = efectivo mostrado +
+            valor de mercado de las posiciones abiertas. G/P realizado en ventas usa el valor guardado en
+            cada venta (puede coincidir con el extracto del broker).
           </p>
+          {cashAdjustmentUsd != null &&
+            cashAdjustmentUsd !== 0 &&
+            estimatedCashBeforeAdjustment != null && (
+              <p className="text-xs text-muted-foreground">
+                Efectivo por fórmula: {formatCurrency(estimatedCashBeforeAdjustment, "USD")} ·{" "}
+                {formatCurrency(convertUsdToGtq(estimatedCashBeforeAdjustment), "GTQ")}
+                {" · "}
+                Ajuste: {cashAdjustmentUsd > 0 ? "+" : ""}
+                {formatCurrency(cashAdjustmentUsd, "USD")}
+              </p>
+            )}
         </div>
       )}
     </div>

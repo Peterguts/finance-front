@@ -18,10 +18,28 @@ const API_BASE =
     ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")
     : "/api";
 
+function detailMessage(detail: unknown): string {
+  if (detail == null) return "Request failed";
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail.map((x) => {
+      if (typeof x === "object" && x !== null && "msg" in x) {
+        return String((x as { msg: string }).msg);
+      }
+      return JSON.stringify(x);
+    });
+    return parts.join("; ") || "Request failed";
+  }
+  if (typeof detail === "object" && "message" in detail) {
+    return String((detail as { message: string }).message);
+  }
+  return "Request failed";
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "An error occurred" }));
-    throw new Error(error.detail || "Request failed");
+    throw new Error(detailMessage((error as { detail?: unknown }).detail));
   }
   return response.json();
 }
@@ -180,6 +198,28 @@ export async function createSale(data: SaleCreate): Promise<Sale> {
     body: JSON.stringify(data),
   });
   return handleResponse<Sale>(response);
+}
+
+export async function updateSale(
+  id: string,
+  data: { quantity?: number; sell_price?: number }
+): Promise<Sale> {
+  const response = await fetch(`${API_BASE}/sales/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<Sale>(response);
+}
+
+export async function deleteSale(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/sales/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Failed to delete sale" }));
+    throw new Error(detailMessage((error as { detail?: unknown }).detail));
+  }
 }
 
 export async function fetchDeposits(): Promise<Deposit[]> {

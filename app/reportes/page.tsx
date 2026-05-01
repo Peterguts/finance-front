@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import useSWR from "swr";
 import { Loader2, Filter, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { MovementSellActions } from "@/components/movement-sell-actions";
 import { fetchMovements, fetchPortfolioSummary, fetchUsdGtqRate } from "@/lib/api";
 import { cn, convertUsdToGtq, formatCurrency, formatNumber, setUsdToGtqRate } from "@/lib/utils";
 import { useEffect } from "react";
@@ -24,7 +25,9 @@ export default function ReportesPage() {
   const [tickerFilter, setTickerFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "buy" | "sell">("all");
 
-  const { data: portfolio } = useSWR("portfolio", fetchPortfolioSummary, { refreshInterval: 30000 });
+  const { data: portfolio, mutate: mutatePortfolio } = useSWR("portfolio", fetchPortfolioSummary, {
+    refreshInterval: 30000,
+  });
   const { data: fxRate } = useSWR("fx-usd-gtq", fetchUsdGtqRate, { refreshInterval: 300000 });
   const tickers = useMemo(() => {
     const fromPos = portfolio?.positions?.map((p) => p.ticker) ?? [];
@@ -50,7 +53,8 @@ export default function ReportesPage() {
   );
 
   const handleRefresh = () => {
-    mutate();
+    mutate(undefined, { revalidate: true });
+    mutatePortfolio(undefined, { revalidate: true });
   };
 
   useEffect(() => {
@@ -183,12 +187,15 @@ export default function ReportesPage() {
                     <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       G/P realizado
                     </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[100px]">
+                      Acciones
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {movements?.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                      <td colSpan={8} className="px-4 py-12 text-center text-sm text-muted-foreground">
                         No hay movimientos con los filtros seleccionados.
                       </td>
                     </tr>
@@ -251,6 +258,9 @@ export default function ReportesPage() {
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-right align-top">
+                          <MovementSellActions movement={m} onSuccess={handleRefresh} />
                         </td>
                       </tr>
                     ))

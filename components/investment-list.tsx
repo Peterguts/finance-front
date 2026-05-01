@@ -28,6 +28,54 @@ interface InvestmentListProps {
   onChange: () => void;
 }
 
+/** Filas agrupadas por ticker: números mostrados alineados con posición neta del backend cuando existe. */
+function rowMetrics(
+  row: { ticker: string; amount: number; buy_price: number },
+  positionsByTicker: Record<string, PortfolioPosition>,
+  prices: Record<string, number>
+) {
+  const pos = positionsByTicker[row.ticker];
+  const priceFallback = getCurrentPrice(prices, row.ticker, row.buy_price);
+
+  if (pos && pos.quantity > 0) {
+    const avgBuy = pos.cost_basis / pos.quantity;
+    return {
+      quantity: pos.quantity,
+      buyPrice: avgBuy,
+      currentPrice: pos.current_value / pos.quantity,
+      investedUsd: pos.cost_basis,
+      currentValueUsd: pos.current_value,
+      pnlUsd: pos.unrealized_pnl,
+      pnlIsRealizedOnly: false,
+    };
+  }
+
+  if (pos && pos.quantity <= 0 && row.amount > 0) {
+    return {
+      quantity: 0,
+      buyPrice: row.buy_price,
+      currentPrice: priceFallback,
+      investedUsd: 0,
+      currentValueUsd: 0,
+      pnlUsd: pos.realized_pnl,
+      pnlIsRealizedOnly: true,
+    };
+  }
+
+  const qty = row.amount;
+  const buyP = row.buy_price;
+  const curP = priceFallback;
+  return {
+    quantity: qty,
+    buyPrice: buyP,
+    currentPrice: curP,
+    investedUsd: qty * buyP,
+    currentValueUsd: qty * curP,
+    pnlUsd: qty * curP - qty * buyP,
+    pnlIsRealizedOnly: false,
+  };
+}
+
 export function InvestmentList({
   investments,
   prices,
@@ -238,13 +286,10 @@ export function InvestmentList({
       {/* Mobile: tarjetas */}
       <div className="grid gap-3 sm:hidden">
         {groupedInvestments.map((investment) => {
-          const currentPrice = getCurrentPrice(prices, investment.ticker, investment.buy_price);
-          const investedValueUsd = investment.amount * investment.buy_price;
-          const currentValueUsd = investment.amount * currentPrice;
-          const pnlUsd = currentValueUsd - investedValueUsd;
-          const pnlPercent = investedValueUsd > 0 ? (pnlUsd / investedValueUsd) * 100 : 0;
-          const isPositive = pnlUsd > 0;
-          const isNegative = pnlUsd < 0;
+          const m = rowMetrics(investment, positionsByTicker, prices);
+          const pnlPercent = m.investedUsd > 0 ? (m.pnlUsd / m.investedUsd) * 100 : 0;
+          const isPositive = m.pnlUsd > 0;
+          const isNegative = m.pnlUsd < 0;
 
           const displayTicker =
             investment.ticker.toUpperCase().endsWith("-USD")
@@ -315,13 +360,13 @@ export function InvestmentList({
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Cantidad
                   </p>
-                  <p className="mt-1 font-mono text-sm text-foreground">{formatNumber(investment.amount)}</p>
+                  <p className="mt-1 font-mono text-sm text-foreground">{formatNumber(m.quantity)}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Valor
                   </p>
-                  <p className="mt-1 font-mono text-sm text-foreground">{formatCurrency(currentValueUsd, "USD")}</p>
+                  <p className="mt-1 font-mono text-sm text-foreground">{formatCurrency(m.currentValueUsd, "USD")}</p>
                 </div>
               </div>
 
@@ -330,20 +375,22 @@ export function InvestmentList({
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Compra
                   </p>
-                  <p className="mt-1 font-mono text-sm text-foreground">{formatCurrency(investment.buy_price, "USD")}</p>
-                  <p className="text-[11px] text-muted-foreground">{formatCurrency(convertUsdToGtq(investment.buy_price), "GTQ")}</p>
+                  <p className="mt-1 font-mono text-sm text-foreground">{formatCurrency(m.buyPrice, "USD")}</p>
+                  <p className="text-[11px] text-muted-foreground">{formatCurrency(convertUsdToGtq(m.buyPrice), "GTQ")}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Actual
                   </p>
-                  <p className="mt-1 font-mono text-sm text-foreground">{formatCurrency(currentPrice, "USD")}</p>
-                  <p className="text-[11px] text-muted-foreground">{formatCurrency(convertUsdToGtq(currentPrice), "GTQ")}</p>
+                  <p className="mt-1 font-mono text-sm text-foreground">{formatCurrency(m.currentPrice, "USD")}</p>
+                  <p className="text-[11px] text-muted-foreground">{formatCurrency(convertUsdToGtq(m.currentPrice), "GTQ")}</p>
                 </div>
               </div>
 
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">G/P</span>
+                <span className="text-xs text-muted-foreground">
+                  G/P{m.pnlIsRealizedOnly ? " (realizado)" : ""}
+                </span>
                 <div className="text-right">
                   <p
                     className={cn(
@@ -353,15 +400,16 @@ export function InvestmentList({
                       !isPositive && !isNegative && "text-muted-foreground"
                     )}
                   >
-                    {pnlUsd > 0 ? "+" : ""}
-                    {formatCurrency(pnlUsd, "USD")}
+                    {m.pnlUsd > 0 ? "+" : ""}
+                    {m.pnlUsd !== 0 ? formatCurrency(m.pnlUsd, "USD") : "—"}
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground">
-                    {pnlUsd > 0 ? "+" : ""}
-                    {formatCurrency(convertUsdToGtq(pnlUsd), "GTQ")}
+                    {m.pnlUsd !== 0
+                      ? `${m.pnlUsd > 0 ? "+" : ""}${formatCurrency(convertUsdToGtq(m.pnlUsd), "GTQ")}`
+                      : ""}
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground/80">
-                    {pnlPercent !== 0 ? formatPercentage(pnlPercent) : "Pendiente"}
+                    {pnlPercent !== 0 ? formatPercentage(pnlPercent) : m.pnlIsRealizedOnly ? "" : "Pendiente"}
                   </p>
                 </div>
               </div>
@@ -401,20 +449,13 @@ export function InvestmentList({
             </thead>
             <tbody>
               {groupedInvestments.map((investment) => {
-                const currentPrice = getCurrentPrice(
-                  prices,
-                  investment.ticker,
-                  investment.buy_price
-                );
-                const investedValueUsd = investment.amount * investment.buy_price;
-                const currentValueUsd = investment.amount * currentPrice;
-                const pnlUsd = currentValueUsd - investedValueUsd;
+                const m = rowMetrics(investment, positionsByTicker, prices);
                 const pnlPercent =
-                  investedValueUsd > 0 ? (pnlUsd / investedValueUsd) * 100 : 0;
-                const isPositive = pnlUsd >= 0;
+                  m.investedUsd > 0 ? (m.pnlUsd / m.investedUsd) * 100 : 0;
+                const isPositive = m.pnlUsd >= 0;
 
-                const currentValueGtq = convertUsdToGtq(currentValueUsd);
-                const pnlGtq = convertUsdToGtq(pnlUsd);
+                const currentValueGtq = convertUsdToGtq(m.currentValueUsd);
+                const pnlGtq = convertUsdToGtq(m.pnlUsd);
 
                 const displayTicker =
                   investment.ticker.toUpperCase().endsWith("-USD")
@@ -447,22 +488,22 @@ export function InvestmentList({
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-sm text-foreground">
-                      {formatNumber(investment.amount)}
+                      {formatNumber(m.quantity)}
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-sm text-foreground">
-                      <div>{formatCurrency(investment.buy_price, "USD")}</div>
+                      <div>{formatCurrency(m.buyPrice, "USD")}</div>
                       <div className="text-xs text-muted-foreground">
-                        {formatCurrency(convertUsdToGtq(investment.buy_price), "GTQ")}
+                        {formatCurrency(convertUsdToGtq(m.buyPrice), "GTQ")}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-sm text-foreground">
-                      <div>{formatCurrency(currentPrice, "USD")}</div>
+                      <div>{formatCurrency(m.currentPrice, "USD")}</div>
                       <div className="text-xs text-muted-foreground">
-                        {formatCurrency(convertUsdToGtq(currentPrice), "GTQ")}
+                        {formatCurrency(convertUsdToGtq(m.currentPrice), "GTQ")}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-sm font-medium text-foreground">
-                      <div>{formatCurrency(currentValueUsd, "USD")}</div>
+                      <div>{formatCurrency(m.currentValueUsd, "USD")}</div>
                       <div className="text-xs text-muted-foreground">
                         {formatCurrency(currentValueGtq, "GTQ")}
                       </div>
@@ -471,30 +512,45 @@ export function InvestmentList({
                       <div
                         className={cn(
                           "flex items-center justify-end gap-1",
-                          isPositive ? "text-success" : "text-destructive"
+                          m.pnlUsd === 0
+                            ? "text-muted-foreground"
+                            : isPositive
+                              ? "text-success"
+                              : "text-destructive"
                         )}
                       >
                         <span className="font-mono text-base font-semibold">
-                          {isPositive ? "+" : ""}
-                          {formatCurrency(pnlUsd, "USD")}
+                          {m.pnlIsRealizedOnly && m.pnlUsd !== 0 ? "R: " : ""}
+                          {m.pnlUsd > 0 ? "+" : ""}
+                          {m.pnlUsd !== 0 ? formatCurrency(m.pnlUsd, "USD") : "—"}
                         </span>
-                        {isPositive ? (
-                          <TrendingUp className="h-4 w-4" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4" />
-                        )}
+                        {m.pnlUsd !== 0 &&
+                          (isPositive ? (
+                            <TrendingUp className="h-4 w-4" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4" />
+                          ))}
                       </div>
                       <p
                         className={cn(
                           "font-mono text-xs",
-                          isPositive ? "text-success/70" : "text-destructive/70"
+                          m.pnlUsd === 0
+                            ? "text-muted-foreground"
+                            : isPositive
+                              ? "text-success/70"
+                              : "text-destructive/70"
                         )}
                       >
-                        {isPositive ? "+" : ""}
-                        {formatCurrency(pnlGtq, "GTQ")}
+                        {m.pnlUsd !== 0
+                          ? `${m.pnlUsd > 0 ? "+" : ""}${formatCurrency(pnlGtq, "GTQ")}`
+                          : ""}
                       </p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {formatPercentage(pnlPercent)}
+                        {m.investedUsd > 0 && !m.pnlIsRealizedOnly
+                          ? formatPercentage(pnlPercent)
+                          : m.pnlIsRealizedOnly
+                            ? "Ventas"
+                            : ""}
                       </p>
                     </td>
                     <td className="px-6 py-4 text-right">
