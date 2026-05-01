@@ -70,6 +70,13 @@ export function getCurrentPrice(
   return fallback;
 }
 
+/** Coherente con el backend: menos que esto es polvo numérico, no posición abierta. */
+export const MIN_MEANINGFUL_POSITION_QTY = 1e-4;
+
+export function isMeaningfulOpenPosition(quantity: number): boolean {
+  return quantity > MIN_MEANINGFUL_POSITION_QTY;
+}
+
 /** Alineado con el backend: un solo símbolo para LINK. */
 export function normalizeTicker(ticker: string): string {
   const t = (ticker || "").trim().toUpperCase();

@@ -13,7 +13,7 @@ import {
   fetchUsdGtqRate,
 } from "@/lib/api";
 import type { PortfolioPosition } from "@/lib/types";
-import { formatNumber, normalizeTicker, setUsdToGtqRate } from "@/lib/utils";
+import { formatNumber, isMeaningfulOpenPosition, normalizeTicker, setUsdToGtqRate } from "@/lib/utils";
 import { useEffect, useMemo } from "react";
 
 export default function InversionesPage() {
@@ -48,7 +48,7 @@ export default function InversionesPage() {
   const investmentsOpenOnly = useMemo(() => {
     const open = new Set(
       (portfolio?.positions ?? [])
-        .filter((p) => p.quantity > 0)
+        .filter((p) => isMeaningfulOpenPosition(p.quantity))
         .map((p) => normalizeTicker(p.ticker))
     );
     return (portfolio?.investments ?? []).filter((inv) =>

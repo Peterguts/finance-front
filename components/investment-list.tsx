@@ -17,6 +17,7 @@ import {
   formatNumber,
   formatPercentage,
   getCurrentPrice,
+  isMeaningfulOpenPosition,
   normalizeTicker,
 } from "@/lib/utils";
 import { createSale, deleteInvestment, fetchPrice, updateInvestment } from "@/lib/api";
@@ -37,7 +38,7 @@ function rowMetrics(
   const pos = positionsByTicker[row.ticker];
   const priceFallback = getCurrentPrice(prices, row.ticker, row.buy_price);
 
-  if (pos && pos.quantity > 0) {
+  if (pos && isMeaningfulOpenPosition(pos.quantity)) {
     const avgBuy = pos.cost_basis / pos.quantity;
     return {
       quantity: pos.quantity,
@@ -50,7 +51,7 @@ function rowMetrics(
     };
   }
 
-  if (pos && pos.quantity <= 0 && row.amount > 0) {
+  if (pos && !isMeaningfulOpenPosition(pos.quantity) && row.amount > 0) {
     return {
       quantity: 0,
       buyPrice: row.buy_price,
@@ -150,7 +151,7 @@ export function InvestmentList({
 
   const openSellModal = async (ticker: string) => {
     const pos = positionsByTicker[ticker];
-    if (!pos || pos.quantity <= 0) {
+    if (!pos || !isMeaningfulOpenPosition(pos.quantity)) {
       setSellError("No tienes cantidad disponible para vender de este activo.");
       return;
     }

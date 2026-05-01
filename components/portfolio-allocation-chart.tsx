@@ -2,7 +2,13 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import type { PortfolioPosition } from "@/lib/types";
-import { convertUsdToGtq, formatCurrency, formatPercentage, normalizeTicker } from "@/lib/utils";
+import {
+  convertUsdToGtq,
+  formatCurrency,
+  formatPercentage,
+  isMeaningfulOpenPosition,
+  normalizeTicker,
+} from "@/lib/utils";
 
 interface PortfolioAllocationChartProps {
   /** Solo posiciones con cantidad > 0; usa current_value del backend (coherente con "Valor actual"). */
@@ -31,7 +37,7 @@ function colorForName(name: string): string {
 export function PortfolioAllocationChart({ positions }: PortfolioAllocationChartProps) {
   const merged = new Map<string, { name: string; valueUsd: number }>();
   for (const p of positions) {
-    if (p.quantity <= 0 || p.current_value <= 0) continue;
+    if (!isMeaningfulOpenPosition(p.quantity) || p.current_value <= 0) continue;
     const key = normalizeTicker(p.ticker);
     const add = p.current_value;
     const prev = merged.get(key);

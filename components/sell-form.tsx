@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { TrendingDown, Loader2 } from "lucide-react";
 import { createSale, fetchPrice } from "@/lib/api";
 import type { PortfolioPosition } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, isMeaningfulOpenPosition } from "@/lib/utils";
 
 interface SellFormProps {
   positions: PortfolioPosition[];
@@ -20,7 +20,7 @@ export function SellForm({ positions, onSuccess }: SellFormProps) {
   const [quantity, setQuantity] = useState("");
   const [sellPrice, setSellPrice] = useState("");
 
-  const availablePositions = positions.filter((p) => p.quantity > 0);
+  const availablePositions = positions.filter((p) => isMeaningfulOpenPosition(p.quantity));
   const selectedPosition = availablePositions.find((p) => p.ticker === ticker);
 
   useEffect(() => {

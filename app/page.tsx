@@ -33,6 +33,7 @@ import {
   formatCurrency,
   formatNumber,
   normalizeTicker,
+  isMeaningfulOpenPosition,
   setUsdToGtqRate,
 } from "@/lib/utils";
 import type { PortfolioPosition } from "@/lib/types";
@@ -95,7 +96,7 @@ export default function DashboardPage() {
   const investmentsOpenOnly = useMemo(() => {
     const open = new Set(
       (portfolio?.positions ?? [])
-        .filter((p) => p.quantity > 0)
+        .filter((p) => isMeaningfulOpenPosition(p.quantity))
         .map((p) => normalizeTicker(p.ticker))
     );
     return (portfolio?.investments ?? []).filter((inv) =>
@@ -347,7 +348,7 @@ export default function DashboardPage() {
                     const hasRealized = pos.realized_pnl !== 0;
                     const unrealizedPos = pos.unrealized_pnl > 0;
                     const realizedPos = pos.realized_pnl > 0;
-                    const hasPosition = pos.quantity > 0;
+                    const hasPosition = isMeaningfulOpenPosition(pos.quantity);
                     const relatedSells = (movements ?? []).filter(
                       (m) => m.type === "sell" && m.ticker.toUpperCase() === pos.ticker.toUpperCase()
                     );
