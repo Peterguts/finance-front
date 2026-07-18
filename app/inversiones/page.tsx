@@ -6,6 +6,7 @@ import { Loader2, PiggyBank } from "lucide-react";
 import { InvestmentList } from "@/components/investment-list";
 import { AddInvestmentForm } from "@/components/add-investment-form";
 import { AppHeader } from "@/components/app-header";
+import { PageHeader } from "@/components/page-header";
 import {
   fetchPortfolioSummary,
   fetchPricesForTickers,
@@ -73,7 +74,12 @@ export default function InversionesPage() {
         fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
+        <PageHeader
+          eyebrow="Posiciones abiertas"
+          title="Inversiones"
+          subtitle="Añade, corrige o vende tus posiciones actuales."
+        />
         {error ? (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
             <p className="text-destructive">
@@ -106,7 +112,6 @@ export default function InversionesPage() {
                 Añadir depósito
               </Link>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">Posiciones abiertas.</p>
             <InvestmentList
               investments={investmentsOpenOnly}
               prices={prices ?? {}}

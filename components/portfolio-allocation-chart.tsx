@@ -1,6 +1,5 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import type { PortfolioPosition } from "@/lib/types";
 import {
   convertUsdToGtq,
@@ -15,6 +14,7 @@ interface PortfolioAllocationChartProps {
   positions: PortfolioPosition[];
 }
 
+// Paleta categórica validada (ver globals.css) — orden fijo, nunca reciclada
 const CHART_COLORS = [
   "var(--chart-1)",
   "var(--chart-2)",
@@ -25,35 +25,17 @@ const CHART_COLORS = [
   "var(--chart-7)",
 ];
 
-function colorForName(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  }
-  const index = Math.abs(hash) % CHART_COLORS.length;
-  return CHART_COLORS[index];
-}
-
 export function PortfolioAllocationChart({ positions }: PortfolioAllocationChartProps) {
-  const merged = new Map<string, { name: string; valueUsd: number }>();
+  const merged = new Map<string, number>();
   for (const p of positions) {
     if (!isMeaningfulOpenPosition(p.quantity) || p.current_value <= 0) continue;
     const key = normalizeTicker(p.ticker);
-    const add = p.current_value;
-    const prev = merged.get(key);
-    if (prev) {
-      prev.valueUsd += add;
-    } else {
-      merged.set(key, { name: key, valueUsd: add });
-    }
+    merged.set(key, (merged.get(key) ?? 0) + p.current_value);
   }
 
-  const items = [...merged.values()].map((m) => ({
-    name: m.name,
-    valueUsd: m.valueUsd,
-    valueGtq: convertUsdToGtq(m.valueUsd),
-    value: m.valueUsd,
-  }));
+  const items = [...merged.entries()]
+    .map(([name, valueUsd]) => ({ name, valueUsd, valueGtq: convertUsdToGtq(valueUsd) }))
+    .sort((a, b) => b.valueUsd - a.valueUsd);
 
   const totalUsd = items.reduce((sum, item) => sum + item.valueUsd, 0);
 
@@ -67,89 +49,64 @@ export function PortfolioAllocationChart({ positions }: PortfolioAllocationChart
     );
   }
 
-  const sorted = [...items].sort((a, b) => b.valueUsd - a.valueUsd);
-
   return (
     <div className="rounded-xl border border-border bg-card p-6">
-      <h2 className="text-base font-semibold text-foreground mb-1">Distribución del portafolio</h2>
-      <p className="text-sm text-muted-foreground mb-6">
-        Porcentaje del valor en acciones (posiciones abiertas al precio actual). No incluye efectivo.
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
+        Distribución
       </p>
+      <h2 className="font-display mt-1 text-xl text-card-foreground">
+        ¿Dónde está tu dinero?
+      </h2>
 
-      <div className="h-[280px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-            <Pie
-              data={sorted}
-              cx="50%"
-              cy="50%"
-              innerRadius="55%"
-              outerRadius="85%"
-              paddingAngle={2}
-              dataKey="value"
-              nameKey="name"
-            >
-              {sorted.map((item) => (
-                <Cell key={item.name} fill={colorForName(item.name)} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "var(--color-card)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-md)",
-              }}
-              labelStyle={{ color: "var(--color-foreground)" }}
-              formatter={(value: number, name: string, props: { payload?: { valueGtq?: number } }) => {
-                const pct = totalUsd > 0 ? (value / totalUsd) * 100 : 0;
-                const valueGtq = props.payload?.valueGtq ?? 0;
-                return [
-                  `${formatCurrency(value, "USD")} · ${formatCurrency(valueGtq, "GTQ")} (${formatPercentage(pct)})`,
-                  name,
-                ];
-              }}
-            />
-            <Legend
-              layout="vertical"
-              align="right"
-              verticalAlign="middle"
-              formatter={(value) => {
-                const item = sorted.find((i) => i.name === value);
-                const pct = item && totalUsd > 0 ? (item.valueUsd / totalUsd) * 100 : 0;
-                return (
-                  <span className="text-sm text-foreground">
-                    {value} · {formatPercentage(pct)}
-                  </span>
-                );
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-        {sorted.map((item) => {
+      {/* Cinta del portafolio: cada activo es un segmento proporcional */}
+      <div
+        className="mt-6 flex h-5 w-full gap-[2px]"
+        role="img"
+        aria-label={`Distribución del portafolio: ${items
+          .map((i) => `${i.name} ${formatPercentage((i.valueUsd / totalUsd) * 100)}`)
+          .join(", ")}`}
+      >
+        {items.map((item, index) => {
           const pct = (item.valueUsd / totalUsd) * 100;
           return (
             <div
               key={item.name}
-              className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3"
+              className="rounded-[4px] transition-opacity hover:opacity-80"
+              style={{
+                width: `${pct}%`,
+                minWidth: "6px",
+                backgroundColor: CHART_COLORS[index % CHART_COLORS.length],
+              }}
+              title={`${item.name} · ${formatCurrency(item.valueUsd, "USD")} (${formatPercentage(pct)})`}
+            />
+          );
+        })}
+      </div>
+
+      {/* Filas: etiqueta directa de cada segmento (mismo orden y color) */}
+      <div className="mt-5 divide-y divide-border">
+        {items.map((item, index) => {
+          const pct = (item.valueUsd / totalUsd) * 100;
+          return (
+            <div
+              key={item.name}
+              className="flex items-center justify-between gap-4 py-3 transition-colors hover:bg-muted/30"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <span
                   className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: colorForName(item.name) }}
+                  style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
                 />
-                <div>
-                  <p className="font-medium text-foreground">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCurrency(item.valueUsd, "USD")} · {formatCurrency(item.valueGtq, "GTQ")}
-                  </p>
-                </div>
+                <p className="font-mono text-sm font-semibold text-foreground">{item.name}</p>
               </div>
-              <p className="text-sm font-medium text-muted-foreground tabular-nums">
-                {formatPercentage(pct)}
-              </p>
+              <div className="flex items-baseline gap-4">
+                <p className="hidden font-mono text-xs text-muted-foreground tabular-nums sm:block">
+                  {formatCurrency(item.valueUsd, "USD")} · {formatCurrency(item.valueGtq, "GTQ")}
+                </p>
+                <p className="w-16 text-right font-mono text-sm font-medium text-foreground tabular-nums">
+                  {formatPercentage(pct)}
+                </p>
+              </div>
             </div>
           );
         })}

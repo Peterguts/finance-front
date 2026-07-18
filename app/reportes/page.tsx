@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import useSWR from "swr";
 import { Loader2, Filter, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { PageHeader } from "@/components/page-header";
 import { MovementSellActions } from "@/components/movement-sell-actions";
 import { fetchMovements, fetchPortfolioSummary, fetchUsdGtqRate } from "@/lib/api";
 import { cn, convertUsdToGtq, formatCurrency, formatNumber, setUsdToGtqRate } from "@/lib/utils";
@@ -69,13 +70,12 @@ export default function ReportesPage() {
         fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold text-foreground">Reportes e historial</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Consulta todos tus movimientos (compras y ventas) con filtros por fecha y activo.
-          </p>
-        </div>
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
+        <PageHeader
+          eyebrow="Historial completo"
+          title="Reportes"
+          subtitle="Consulta todos tus movimientos (compras y ventas) con filtros por fecha y activo."
+        />
 
         <div className="mb-6 rounded-xl border border-border bg-card p-4">
           <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">

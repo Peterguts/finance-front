@@ -1,11 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins, JetBrains_Mono } from "next/font/google";
+import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const poppins = Poppins({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-poppins",
+  variable: "--font-inter",
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -13,13 +12,19 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
 });
 
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  axes: ["opsz"],
+});
+
 export const metadata: Metadata = {
-  title: "Finanzas | Tu portfolio en tiempo real",
+  title: "Finanzas | Tu portafolio en tiempo real",
   description: "Gestiona tus inversiones en acciones y cripto con ganancias/pérdidas y precios en tiempo real",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: "#f6f4ee",
   width: "device-width",
   initialScale: 1,
 };
@@ -30,7 +35,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${poppins.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="es"
+      className={`${inter.variable} ${jetbrainsMono.variable} ${fraunces.variable}`}
+    >
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

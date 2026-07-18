@@ -376,7 +376,7 @@ function Metric({
         <>
           <p
             className={cn(
-              "mt-2 font-mono text-2xl font-semibold",
+              "mt-2 font-mono text-3xl font-extrabold tabular-nums",
               positive == null && "text-foreground",
               positive === true && "text-success",
               positive === false && "text-destructive"
@@ -390,5 +390,3 @@ function Metric({
     </div>
   );
 }
-
-

@@ -18,6 +18,43 @@ const API_BASE =
     ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "")
     : "/api";
 
+const TOKEN_KEY = "finanzas_token";
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+}
+
+function setToken(token: string) {
+  window.localStorage.setItem(TOKEN_KEY, token);
+  // Cookie legible por el middleware de Next para proteger rutas
+  document.cookie = `${TOKEN_KEY}=${token}; path=/; max-age=604800; samesite=lax`;
+}
+
+export function clearToken() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(TOKEN_KEY);
+  document.cookie = `${TOKEN_KEY}=; path=/; max-age=0; samesite=lax`;
+}
+
+function redirectToLogin() {
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { ...authHeaders(), ...(init.headers || {}) },
+  });
+}
+
 function detailMessage(detail: unknown): string {
   if (detail == null) return "Request failed";
   if (typeof detail === "string") return detail;
@@ -37,6 +74,11 @@ function detailMessage(detail: unknown): string {
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
+  if (response.status === 401) {
+    clearToken();
+    redirectToLogin();
+    throw new Error("Sesión expirada. Inicia sesión de nuevo.");
+  }
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "An error occurred" }));
     throw new Error(detailMessage((error as { detail?: unknown }).detail));
@@ -44,19 +86,35 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
+export async function login(email: string, password: string): Promise<{ email: string }> {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await handleResponse<{ access_token: string; email: string }>(response);
+  setToken(data.access_token);
+  return { email: data.email };
+}
+
+export function logout() {
+  clearToken();
+  redirectToLogin();
+}
+
 export async function fetchPortfolioSummary(): Promise<PortfolioSummary> {
-  const response = await fetch(`${API_BASE}/portfolio/summary`);
+  const response = await apiFetch(`/portfolio/summary`);
   return handleResponse<PortfolioSummary>(response);
 }
 
 export async function fetchInvestments(ticker?: string): Promise<Investment[]> {
   const q = ticker?.trim() ? `?ticker=${encodeURIComponent(ticker.trim())}` : "";
-  const response = await fetch(`${API_BASE}/investments${q}`);
+  const response = await apiFetch(`/investments${q}`);
   return handleResponse<Investment[]>(response);
 }
 
 export async function createInvestment(data: InvestmentCreate): Promise<Investment> {
-  const response = await fetch(`${API_BASE}/investments`, {
+  const response = await apiFetch(`/investments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -68,7 +126,7 @@ export async function updateInvestment(
   id: string,
   data: Partial<InvestmentCreate>
 ): Promise<Investment> {
-  const response = await fetch(`${API_BASE}/investments/${id}`, {
+  const response = await apiFetch(`/investments/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -77,22 +135,27 @@ export async function updateInvestment(
 }
 
 export async function deleteInvestment(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/investments/${id}`, {
+  const response = await apiFetch(`/investments/${id}`, {
     method: "DELETE",
   });
+  if (response.status === 401) {
+    clearToken();
+    redirectToLogin();
+    throw new Error("Sesión expirada. Inicia sesión de nuevo.");
+  }
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "Failed to delete" }));
-    throw new Error(error.detail);
+    throw new Error(detailMessage((error as { detail?: unknown }).detail));
   }
 }
 
 export async function fetchPrices(): Promise<Record<string, number>> {
-  const response = await fetch(`${API_BASE}/prices`);
+  const response = await apiFetch(`/prices`);
   return handleResponse<Record<string, number>>(response);
 }
 
 export async function fetchPrice(ticker: string): Promise<{ ticker: string; price: number }> {
-  const response = await fetch(`${API_BASE}/prices/${encodeURIComponent(ticker)}`);
+  const response = await apiFetch(`/prices/${encodeURIComponent(ticker)}`);
   return handleResponse<{ ticker: string; price: number }>(response);
 }
 
@@ -187,12 +250,12 @@ export async function fetchSales(params?: {
   if (params?.to_date) search.set("to_date", params.to_date);
   if (params?.limit != null) search.set("limit", String(params.limit));
   const qs = search.toString();
-  const response = await fetch(`${API_BASE}/sales${qs ? `?${qs}` : ""}`);
+  const response = await apiFetch(`/sales${qs ? `?${qs}` : ""}`);
   return handleResponse<Sale[]>(response);
 }
 
 export async function createSale(data: SaleCreate): Promise<Sale> {
-  const response = await fetch(`${API_BASE}/sales`, {
+  const response = await apiFetch(`/sales`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -204,7 +267,7 @@ export async function updateSale(
   id: string,
   data: { quantity?: number; sell_price?: number }
 ): Promise<Sale> {
-  const response = await fetch(`${API_BASE}/sales/${encodeURIComponent(id)}`, {
+  const response = await apiFetch(`/sales/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -213,7 +276,7 @@ export async function updateSale(
 }
 
 export async function deleteSale(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/sales/${encodeURIComponent(id)}`, {
+  const response = await apiFetch(`/sales/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
   if (!response.ok) {
@@ -223,12 +286,12 @@ export async function deleteSale(id: string): Promise<void> {
 }
 
 export async function fetchDeposits(): Promise<Deposit[]> {
-  const response = await fetch(`${API_BASE}/deposits`);
+  const response = await apiFetch(`/deposits`);
   return handleResponse<Deposit[]>(response);
 }
 
 export async function createDeposit(data: DepositCreate): Promise<Deposit> {
-  const response = await fetch(`${API_BASE}/deposits`, {
+  const response = await apiFetch(`/deposits`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -240,7 +303,7 @@ export async function updateDeposit(
   id: string,
   data: Partial<DepositCreate>
 ): Promise<Deposit> {
-  const response = await fetch(`${API_BASE}/deposits/${id}`, {
+  const response = await apiFetch(`/deposits/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -249,12 +312,12 @@ export async function updateDeposit(
 }
 
 export async function deleteDeposit(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/deposits/${id}`, {
+  const response = await apiFetch(`/deposits/${id}`, {
     method: "DELETE",
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "Failed to delete" }));
-    throw new Error(error.detail);
+    throw new Error(detailMessage((error as { detail?: unknown }).detail));
   }
 }
 
@@ -272,12 +335,12 @@ export async function fetchMovements(params?: {
   if (params?.type) search.set("type", params.type);
   if (params?.limit != null) search.set("limit", String(params.limit));
   const qs = search.toString();
-  const response = await fetch(`${API_BASE}/movements${qs ? `?${qs}` : ""}`);
+  const response = await apiFetch(`/movements${qs ? `?${qs}` : ""}`);
   return handleResponse<Movement[]>(response);
 }
 
 export async function fetchSimulatorAssets(): Promise<SimulatorAsset[]> {
-  const response = await fetch(`${API_BASE}/simulator/assets`);
+  const response = await apiFetch(`/simulator/assets`);
   return handleResponse<SimulatorAsset[]>(response);
 }
 
@@ -290,8 +353,8 @@ export async function fetchSimulatorHistory(
   if (params?.interval) search.set("interval", params.interval);
   if (params?.limit != null) search.set("limit", String(params.limit));
   const qs = search.toString();
-  const response = await fetch(
-    `${API_BASE}/simulator/history/${encodeURIComponent(ticker)}${qs ? `?${qs}` : ""}`
+  const response = await apiFetch(
+    `/simulator/history/${encodeURIComponent(ticker)}${qs ? `?${qs}` : ""}`
   );
   return handleResponse<SimulatorHistoryPoint[]>(response);
 }
@@ -300,7 +363,7 @@ export async function simulateScenario(input: {
   ticker: string;
   change_pct: number;
 }): Promise<SimulatorScenarioResult> {
-  const response = await fetch(`${API_BASE}/simulator/scenario`, {
+  const response = await apiFetch(`/simulator/scenario`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

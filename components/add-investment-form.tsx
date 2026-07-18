@@ -63,7 +63,7 @@ export function AddInvestmentForm({ onSuccess }: AddInvestmentFormProps) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition-colors hover:opacity-90"
+        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
       >
         <Plus className="h-4 w-4" />
         Añadir inversión
@@ -148,7 +148,7 @@ export function AddInvestmentForm({ onSuccess }: AddInvestmentFormProps) {
         <button
           type="submit"
           disabled={isLoading}
-          className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {isLoading ? (
             <>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { PageHeader } from "@/components/page-header";
 import {
   createDeposit,
   deleteDeposit,
@@ -156,14 +157,12 @@ export default function DepositosPage() {
         fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 space-y-8">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Depósitos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Registra ingresos a tu cuenta. El total incluye el monto más la comisión en dinero
-            (monto × % comisión).
-          </p>
-        </div>
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12 space-y-8">
+        <PageHeader
+          eyebrow="Capital de inversión"
+          title="Depósitos"
+          subtitle="Registra ingresos a tu cuenta. El total incluye el monto más la comisión en dinero (monto × % comisión)."
+        />
 
         {error ? (
           <div className="rounded-xl border border-border bg-card p-8 text-center text-destructive">
@@ -258,7 +257,7 @@ export default function DepositosPage() {
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
                 >
                   {formLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -446,7 +445,7 @@ export default function DepositosPage() {
                 type="submit"
                 disabled={editLoading}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-1.5 text-xs font-medium text-background",
+                  "inline-flex items-center gap-2 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground",
                   "hover:opacity-90 disabled:opacity-50"
                 )}
               >

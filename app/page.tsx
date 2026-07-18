@@ -16,6 +16,7 @@ import {
 import { PortfolioSummary } from "@/components/portfolio-summary";
 import { PortfolioAllocationChart } from "@/components/portfolio-allocation-chart";
 import { AppHeader } from "@/components/app-header";
+import { PageHeader } from "@/components/page-header";
 import { AddInvestmentForm } from "@/components/add-investment-form";
 import { InvestmentList } from "@/components/investment-list";
 import { MovementSellActions } from "@/components/movement-sell-actions";
@@ -165,9 +166,14 @@ export default function DashboardPage() {
         isRefreshing={portfolioLoading || pricesLoading}
         fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
       />
-      
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 space-y-12">
+
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12 space-y-12">
+        <PageHeader
+          eyebrow="Estado de cuenta personal"
+          title="Dashboard"
+          subtitle="Tu portafolio, depósitos y ventas en un solo lugar."
+        />
         {error ? (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
             <p className="text-destructive">
@@ -203,7 +209,6 @@ export default function DashboardPage() {
             )}
 
             <section id="resumen" className="mb-2 scroll-mt-24">
-              <h2 className="text-base font-bold text-foreground mb-3">Dashboard</h2>
               <PortfolioSummary
                 totalInvested={portfolio.total_invested}
                 currentValue={portfolio.current_value}

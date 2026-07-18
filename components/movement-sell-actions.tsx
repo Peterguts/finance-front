@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2, Pencil, Trash2 } from "lucide-react";
 import type { Movement } from "@/lib/types";
-import { deleteSale, updateSale } from "@/lib/api";
+import { deleteInvestment, deleteSale, updateInvestment, updateSale } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface MovementSellActionsProps {
@@ -11,16 +11,15 @@ interface MovementSellActionsProps {
   onSuccess: () => void;
 }
 
+/** Editar/eliminar un movimiento individual (compra o venta), tal como prometía el
+ * texto original ("edita cada compra individual desde movimientos"). */
 export function MovementSellActions({ movement, onSuccess }: MovementSellActionsProps) {
+  const isBuy = movement.type === "buy";
   const [editing, setEditing] = useState(false);
   const [qty, setQty] = useState(String(movement.quantity));
   const [price, setPrice] = useState(String(movement.price));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  if (movement.type !== "sell") {
-    return <span className="text-muted-foreground text-xs">—</span>;
-  }
 
   const openEdit = () => {
     setError(null);
@@ -50,7 +49,11 @@ export function MovementSellActions({ movement, onSuccess }: MovementSellActions
     }
     setBusy(true);
     try {
-      await updateSale(movement.id, { quantity: q, sell_price: p });
+      if (isBuy) {
+        await updateInvestment(movement.id, { amount: q, buy_price: p });
+      } else {
+        await updateSale(movement.id, { quantity: q, sell_price: p });
+      }
       closeEdit();
       onSuccess();
     } catch (err) {
@@ -61,13 +64,20 @@ export function MovementSellActions({ movement, onSuccess }: MovementSellActions
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("¿Eliminar esta venta? El portafolio y el efectivo estimado se recalcularán.")) {
+    const msg = isBuy
+      ? "¿Eliminar esta compra? El portafolio y el efectivo estimado se recalcularán."
+      : "¿Eliminar esta venta? El portafolio y el efectivo estimado se recalcularán.";
+    if (!window.confirm(msg)) {
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await deleteSale(movement.id);
+      if (isBuy) {
+        await deleteInvestment(movement.id);
+      } else {
+        await deleteSale(movement.id);
+      }
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo eliminar.");
@@ -84,7 +94,7 @@ export function MovementSellActions({ movement, onSuccess }: MovementSellActions
           onClick={openEdit}
           disabled={busy}
           className="inline-flex h-8 items-center rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
-          title="Corregir cantidad o precio de venta"
+          title={isBuy ? "Corregir cantidad o precio de compra" : "Corregir cantidad o precio de venta"}
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
@@ -93,7 +103,7 @@ export function MovementSellActions({ movement, onSuccess }: MovementSellActions
           onClick={handleDelete}
           disabled={busy}
           className="inline-flex h-8 items-center rounded-md border border-border px-2 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
-          title="Eliminar venta"
+          title={isBuy ? "Eliminar compra" : "Eliminar venta"}
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
         </button>
@@ -108,10 +118,12 @@ export function MovementSellActions({ movement, onSuccess }: MovementSellActions
             onSubmit={handleSave}
             className="w-full max-w-sm rounded-xl border border-border bg-card p-5 shadow-lg"
           >
-            <h3 className="text-sm font-semibold text-foreground">Corregir venta · {movement.ticker}</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              Corregir {isBuy ? "compra" : "venta"} · {movement.ticker}
+            </h3>
             <p className="text-xs text-muted-foreground mt-1 mb-3">
               Ajusta la cantidad si hubo un error (ej. 0.8 en vez de 0.0845). El G/P se recalcula con tu
-              precio medio de compra.
+              precio {isBuy ? "de compra" : "medio de compra"}.
             </p>
             {error && (
               <div className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -135,7 +147,7 @@ export function MovementSellActions({ movement, onSuccess }: MovementSellActions
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                  Precio venta ($)
+                  Precio {isBuy ? "compra" : "venta"} ($)
                 </label>
                 <input
                   type="number"
@@ -161,7 +173,7 @@ export function MovementSellActions({ movement, onSuccess }: MovementSellActions
               <button
                 type="submit"
                 disabled={busy}
-                className="inline-flex items-center gap-2 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
               >
                 {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Guardar

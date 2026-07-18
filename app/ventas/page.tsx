@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { Loader2 } from "lucide-react";
 import { SellForm } from "@/components/sell-form";
 import { AppHeader } from "@/components/app-header";
+import { PageHeader } from "@/components/page-header";
 import { fetchPortfolioSummary, fetchUsdGtqRate } from "@/lib/api";
 import { formatNumber, setUsdToGtqRate } from "@/lib/utils";
 import { useEffect } from "react";
@@ -33,13 +34,12 @@ export default function VentasPage() {
         fxRateLabel={fxRate?.rate ? formatNumber(fxRate.rate, 4) : undefined}
       />
 
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold text-foreground">Ventas</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Registra ventas de acciones para llevar el control de ganancias y pérdidas realizadas.
-          </p>
-        </div>
+      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12">
+        <PageHeader
+          eyebrow="Ganancias y pérdidas realizadas"
+          title="Ventas"
+          subtitle="Registra ventas de acciones para llevar el control de ganancias y pérdidas realizadas."
+        />
         {error ? (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
             <p className="text-destructive">

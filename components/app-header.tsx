@@ -13,8 +13,11 @@ import {
   Menu,
   X,
   PiggyBank,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logout } from "@/lib/api";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 function FinanceLogo({ className }: { className?: string }) {
   return (
@@ -102,6 +105,16 @@ export function AppHeader({ onRefresh, isRefreshing, fxRateLabel }: AppHeaderPro
                 <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
               </button>
             )}
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -168,6 +181,20 @@ export function AppHeader({ onRefresh, isRefreshing, fxRateLabel }: AppHeaderPro
                   <span className="text-foreground">{s.label}</span>
                 </Link>
               ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  logout();
+                }}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-semibold",
+                  "border border-border bg-card hover:bg-destructive/10 text-destructive"
+                )}
+              >
+                <LogOut className="h-4 w-4" />
+                Cerrar sesión
+              </button>
             </div>
           </div>
         </div>
