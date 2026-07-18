@@ -126,6 +126,7 @@ export function InvestmentList({
       amount: soleOpenLot ? soleOpenLot.amount : g.amount,
       buy_price: soleOpenLot ? soleOpenLot.buy_price : g.amount > 0 ? g.invested / g.amount : 0,
       timestamp: g.timestamp,
+      remaining_quantity: soleOpenLot ? soleOpenLot.remaining_quantity : g.amount,
       canEdit: !!soleOpenLot,
       canDelete: !!soleOpenLot,
     };
