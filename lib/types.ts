@@ -4,6 +4,8 @@ export interface Investment {
   amount: number;
   buy_price: number;
   timestamp: string;
+  /** FIFO: cuánto de este lote sigue sin vender. */
+  remaining_quantity: number;
 }
 
 export interface PortfolioSummary {

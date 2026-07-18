@@ -86,6 +86,7 @@ export function InvestmentList({
   const groupedInvestments = Object.values(
     investments.reduce((acc, inv) => {
       const key = normalizeTicker(inv.ticker);
+      const isOpenLot = isMeaningfulOpenPosition(inv.remaining_quantity ?? inv.amount);
       const prev = acc[key];
       if (!prev) {
         acc[key] = {
@@ -93,8 +94,8 @@ export function InvestmentList({
           amount: inv.amount,
           invested: inv.amount * inv.buy_price,
           timestamp: inv.timestamp || "",
-          ids: [inv.id],
           source: inv,
+          openLots: isOpenLot ? [inv] : [],
         };
       } else {
         prev.amount += inv.amount;
@@ -103,7 +104,7 @@ export function InvestmentList({
           prev.timestamp = inv.timestamp || "";
           prev.source = inv;
         }
-        prev.ids.push(inv.id);
+        if (isOpenLot) prev.openLots.push(inv);
       }
       return acc;
     }, {} as Record<string, {
@@ -111,18 +112,24 @@ export function InvestmentList({
       amount: number;
       invested: number;
       timestamp: string;
-      ids: string[];
       source: Investment;
+      openLots: Investment[];
     }>)
-  ).map((g) => ({
-    id: g.source.id,
-    ticker: g.ticker,
-    amount: g.amount,
-    buy_price: g.amount > 0 ? g.invested / g.amount : 0,
-    timestamp: g.timestamp,
-    canEdit: g.ids.length === 1,
-    canDelete: g.ids.length === 1,
-  }));
+  ).map((g) => {
+    // Lotes históricos ya vendidos por completo (remaining_quantity = 0) no cuentan
+    // para bloquear Editar/Eliminar: solo importa si queda más de un lote *abierto*
+    // a la vez, que es cuando editar uno u otro sería ambiguo.
+    const soleOpenLot = g.openLots.length === 1 ? g.openLots[0] : null;
+    return {
+      id: soleOpenLot ? soleOpenLot.id : g.source.id,
+      ticker: g.ticker,
+      amount: soleOpenLot ? soleOpenLot.amount : g.amount,
+      buy_price: soleOpenLot ? soleOpenLot.buy_price : g.amount > 0 ? g.invested / g.amount : 0,
+      timestamp: g.timestamp,
+      canEdit: !!soleOpenLot,
+      canDelete: !!soleOpenLot,
+    };
+  });
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sellingTicker, setSellingTicker] = useState<string | null>(null);
@@ -174,7 +181,7 @@ export function InvestmentList({
 
   const openEditModal = (inv: Investment & { canEdit?: boolean }) => {
     if (!inv.canEdit) {
-      setEditError("Esta posición tiene múltiples compras. Edita cada compra individual desde movimientos.");
+      setEditError("Tienes varios lotes abiertos de este activo a la vez. Edita cada uno individualmente desde Reportes.");
       return;
     }
     setEditError(null);
@@ -292,10 +299,7 @@ export function InvestmentList({
           const isPositive = m.pnlUsd > 0;
           const isNegative = m.pnlUsd < 0;
 
-          const displayTicker =
-            investment.ticker.toUpperCase().endsWith("-USD")
-              ? investment.ticker.toUpperCase().replace(/-USD$/, "")
-              : investment.ticker;
+          const displayTicker = investment.ticker.toUpperCase();
 
           return (
             <div key={investment.id} className="rounded-xl border border-border bg-card p-4">
@@ -312,7 +316,7 @@ export function InvestmentList({
                     {displayTicker.slice(0, 2)}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-foreground">{displayTicker}</p>
+                    <p className="text-base font-bold text-foreground">{displayTicker}</p>
                     {!!investment.timestamp && (
                       <p className="text-xs text-muted-foreground">
                         {new Date(investment.timestamp).toLocaleDateString()}
@@ -326,7 +330,7 @@ export function InvestmentList({
                     onClick={() => openEditModal(investment)}
                     disabled={!investment.canEdit}
                     className="inline-flex items-center justify-center rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50"
-                    title={!investment.canEdit ? "Múltiples compras para este ticker" : "Editar"}
+                    title={!investment.canEdit ? "Tienes varios lotes abiertos de este activo a la vez: edítalos individualmente en Reportes" : "Editar"}
                   >
                     <Pencil className="mr-1 h-3.5 w-3.5" />
                     Editar
@@ -345,7 +349,7 @@ export function InvestmentList({
                     disabled={deletingId === investment.id || !investment.canDelete}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
                     aria-label={`Eliminar ${investment.ticker}`}
-                    title={!investment.canDelete ? "Múltiples compras para este ticker" : "Eliminar"}
+                    title={!investment.canDelete ? "Tienes varios lotes abiertos de este activo a la vez: elimínalos individualmente en Reportes" : "Eliminar"}
                   >
                     {deletingId === investment.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -395,7 +399,7 @@ export function InvestmentList({
                 <div className="text-right">
                   <p
                     className={cn(
-                      "font-mono text-base font-semibold",
+                      "font-mono text-lg font-bold",
                       isPositive && "text-success",
                       isNegative && "text-destructive",
                       !isPositive && !isNegative && "text-muted-foreground"
@@ -458,10 +462,7 @@ export function InvestmentList({
                 const currentValueGtq = convertUsdToGtq(m.currentValueUsd);
                 const pnlGtq = convertUsdToGtq(m.pnlUsd);
 
-                const displayTicker =
-                  investment.ticker.toUpperCase().endsWith("-USD")
-                    ? investment.ticker.toUpperCase().replace(/-USD$/, "")
-                    : investment.ticker;
+                const displayTicker = investment.ticker.toUpperCase();
 
                 return (
                   <tr
@@ -481,7 +482,7 @@ export function InvestmentList({
                           {displayTicker.slice(0, 2)}
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">{displayTicker}</p>
+                          <p className="text-base font-bold text-foreground">{displayTicker}</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(investment.timestamp).toLocaleDateString()}
                           </p>
@@ -520,7 +521,7 @@ export function InvestmentList({
                               : "text-destructive"
                         )}
                       >
-                        <span className="font-mono text-base font-semibold">
+                        <span className="font-mono text-lg font-bold">
                           {m.pnlIsRealizedOnly && m.pnlUsd !== 0 ? "R: " : ""}
                           {m.pnlUsd > 0 ? "+" : ""}
                           {m.pnlUsd !== 0 ? formatCurrency(m.pnlUsd, "USD") : "—"}
@@ -562,7 +563,7 @@ export function InvestmentList({
                           disabled={!investment.canEdit}
                           className="inline-flex h-8 items-center justify-center rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
                           aria-label={`Editar ${investment.ticker}`}
-                          title={!investment.canEdit ? "Múltiples compras para este ticker" : "Editar"}
+                          title={!investment.canEdit ? "Tienes varios lotes abiertos de este activo a la vez: edítalos individualmente en Reportes" : "Editar"}
                         >
                           <Pencil className="mr-1 h-3.5 w-3.5" />
                           Editar
@@ -582,7 +583,7 @@ export function InvestmentList({
                           disabled={deletingId === investment.id || !investment.canDelete}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                           aria-label={`Eliminar ${investment.ticker}`}
-                          title={!investment.canDelete ? "Múltiples compras para este ticker" : "Eliminar"}
+                          title={!investment.canDelete ? "Tienes varios lotes abiertos de este activo a la vez: elimínalos individualmente en Reportes" : "Eliminar"}
                         >
                           {deletingId === investment.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -680,7 +681,7 @@ export function InvestmentList({
               <button
                 type="submit"
                 disabled={isSavingEdit}
-                className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-1.5 text-xs font-medium text-background hover:opacity-90 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
                 {isSavingEdit ? (
                   <>
